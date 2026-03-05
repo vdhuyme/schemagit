@@ -1,8 +1,10 @@
+mod mssql;
 mod postgres;
 
 use schemagit_core::DatabaseSchema;
 use thiserror::Error;
 
+pub use mssql::MssqlIntrospector;
 pub use postgres::PostgresIntrospector;
 
 /// Errors that can occur during schema introspection.
@@ -56,6 +58,9 @@ pub fn create_introspector(
 ) -> IntrospectorResult<Box<dyn Introspector>> {
     match db_type.to_lowercase().as_str() {
         "postgres" | "postgresql" => Ok(Box::new(PostgresIntrospector::new(
+            connection_string.to_string(),
+        ))),
+        "mssql" | "sqlserver" => Ok(Box::new(MssqlIntrospector::new(
             connection_string.to_string(),
         ))),
         _ => Err(IntrospectorError::UnsupportedFeature(format!(
