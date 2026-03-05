@@ -49,28 +49,27 @@ pub fn execute(
         .context("Failed to load tags")?;
 
     // Resolve snapshot filename
-    let snapshot_filename = if snapshot_id.ends_with(".snapshot.json") {
-        snapshot_id.to_string()
-    } else if snapshot_id == "latest" {
-        // Get the filename from the list
-        let snapshots = manager.list().context("Failed to list snapshots")?;
-        snapshots
-            .last()
-            .ok_or_else(|| anyhow::anyhow!("No snapshots found"))?
-            .clone()
-    } else {
-        // Convert ID to filename
-        if snapshot_id.len() == 14 {
-            format!(
-                "{}_{}_{}_{}.snapshot.json",
-                &snapshot_id[0..4],
-                &snapshot_id[4..6],
-                &snapshot_id[6..8],
-                &snapshot_id[8..14]
-            )
-        } else {
-            format!("{}.snapshot.json", snapshot_id)
+    let snapshot_filename = match snapshot_id {
+        id if id.ends_with(".snapshot.json") => id.to_string(),
+
+        "latest" => {
+            let snapshots =
+                manager.list().context("Failed to list snapshots")?;
+            snapshots
+                .last()
+                .ok_or_else(|| anyhow::anyhow!("No snapshots found"))?
+                .clone()
         }
+
+        id if id.len() == 14 => format!(
+            "{}_{}_{}_{}.snapshot.json",
+            &id[0..4],
+            &id[4..6],
+            &id[6..8],
+            &id[8..14]
+        ),
+
+        id => format!("{}.snapshot.json", id),
     };
 
     // Verify snapshot exists

@@ -1,3 +1,4 @@
+pub mod mssql;
 pub mod postgres;
 
 use schemagit_diff::SchemaDiff;
@@ -32,6 +33,7 @@ pub fn create_generator(db_type: &str) -> Option<Box<dyn MigrationGenerator>> {
         "postgres" | "postgresql" => {
             Some(Box::new(postgres::PostgresMigrationGenerator))
         }
+        "mssql" | "sqlserver" => Some(Box::new(mssql::MssqlMigrationGenerator)),
         _ => None,
     }
 }
