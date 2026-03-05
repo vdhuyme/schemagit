@@ -6,30 +6,30 @@ use schemagit_snapshot::SnapshotManager;
 pub fn execute(snapshot_id: &str, directory: &str) -> Result<()> {
     let manager = SnapshotManager::new(directory);
 
-    // Try to find the snapshot - could be full filename or just ID
-    let snapshot = if snapshot_id.ends_with(".snapshot.json") {
-        manager.load(snapshot_id)?
-    } else if snapshot_id == "latest" {
-        manager
+    let snapshot = match snapshot_id {
+        id if id.ends_with(".snapshot.json") => manager.load(id)?,
+
+        "latest" => manager
             .latest()
             .context("Failed to load latest snapshot")?
             .ok_or_else(|| {
                 anyhow::anyhow!("No snapshots found in {}", directory)
-            })?
-    } else {
-        // Convert ID to filename (e.g., "20260305071235" -> "2026_03_05_071235.snapshot.json")
-        let filename = if snapshot_id.len() == 14 {
-            format!(
-                "{}_{}_{}_{}.snapshot.json",
-                &snapshot_id[0..4],
-                &snapshot_id[4..6],
-                &snapshot_id[6..8],
-                &snapshot_id[8..14]
-            )
-        } else {
-            format!("{}.snapshot.json", snapshot_id)
-        };
-        manager.load(&filename)?
+            })?,
+
+        id => {
+            let filename = match id.len() {
+                14 => format!(
+                    "{}_{}_{}_{}.snapshot.json",
+                    &id[0..4],
+                    &id[4..6],
+                    &id[6..8],
+                    &id[8..14]
+                ),
+                _ => format!("{}.snapshot.json", id),
+            };
+
+            manager.load(&filename)?
+        }
     };
 
     println!("{}", "=== Snapshot Details ===".bold().cyan());
@@ -49,13 +49,13 @@ pub fn execute(snapshot_id: &str, directory: &str) -> Result<()> {
         println!("  {}", table.name.green().bold());
         println!("    Columns: {}", table.columns.len().to_string().cyan());
 
-        // Show columns
         for column in &table.columns {
             let nullable = if column.nullable { "NULL" } else { "NOT NULL" };
             let default_str = match &column.default {
                 Some(d) => format!(" DEFAULT {}", d),
                 None => String::new(),
             };
+
             println!(
                 "      - {} {} {}{}",
                 column.name,
@@ -65,7 +65,6 @@ pub fn execute(snapshot_id: &str, directory: &str) -> Result<()> {
             );
         }
 
-        // Show indexes
         if !table.indexes.is_empty() {
             println!("    Indexes: {}", table.indexes.len().to_string().cyan());
             for index in &table.indexes {
@@ -79,7 +78,6 @@ pub fn execute(snapshot_id: &str, directory: &str) -> Result<()> {
             }
         }
 
-        // Show foreign keys
         if !table.foreign_keys.is_empty() {
             println!(
                 "    Foreign Keys: {}",

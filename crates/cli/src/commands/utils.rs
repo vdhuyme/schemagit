@@ -2,17 +2,18 @@
 pub fn detect_driver(connection_string: &str) -> Option<String> {
     let lower = connection_string.to_lowercase();
 
-    if lower.starts_with("postgresql://") || lower.starts_with("postgres://") {
-        Some("postgres".to_string())
-    } else if lower.starts_with("mysql://") {
-        Some("mysql".to_string())
-    } else if lower.starts_with("sqlite://") || lower.starts_with("file:") {
-        Some("sqlite".to_string())
-    } else if lower.starts_with("mssql://") || lower.starts_with("sqlserver://")
-    {
-        Some("mssql".to_string())
-    } else {
-        None
+    match lower.as_str() {
+        s if s.starts_with("postgresql://") || s.starts_with("postgres://") => {
+            Some("postgres".to_string())
+        }
+        s if s.starts_with("mysql://") => Some("mysql".to_string()),
+        s if s.starts_with("sqlite://") || s.starts_with("file:") => {
+            Some("sqlite".to_string())
+        }
+        s if s.starts_with("mssql://") || s.starts_with("sqlserver://") => {
+            Some("mssql".to_string())
+        }
+        _ => None,
     }
 }
 

@@ -7,30 +7,30 @@ use std::collections::HashMap;
 pub fn execute(snapshot_id: &str, directory: &str) -> Result<()> {
     let manager = SnapshotManager::new(directory);
 
-    // Try to find the snapshot - could be full filename or just ID
-    let snapshot = if snapshot_id.ends_with(".snapshot.json") {
-        manager.load(snapshot_id)?
-    } else if snapshot_id == "latest" {
-        manager
+    let snapshot = match snapshot_id {
+        id if id.ends_with(".snapshot.json") => manager.load(id)?,
+
+        "latest" => manager
             .latest()
             .context("Failed to load latest snapshot")?
             .ok_or_else(|| {
                 anyhow::anyhow!("No snapshots found in {}", directory)
-            })?
-    } else {
-        // Convert ID to filename
-        let filename = if snapshot_id.len() == 14 {
-            format!(
-                "{}_{}_{}_{}.snapshot.json",
-                &snapshot_id[0..4],
-                &snapshot_id[4..6],
-                &snapshot_id[6..8],
-                &snapshot_id[8..14]
-            )
-        } else {
-            format!("{}.snapshot.json", snapshot_id)
-        };
-        manager.load(&filename)?
+            })?,
+
+        id => {
+            let filename = match id.len() {
+                14 => format!(
+                    "{}_{}_{}_{}.snapshot.json",
+                    &id[0..4],
+                    &id[4..6],
+                    &id[6..8],
+                    &id[8..14]
+                ),
+                _ => format!("{}.snapshot.json", id),
+            };
+
+            manager.load(&filename)?
+        }
     };
 
     // Calculate statistics
@@ -66,7 +66,6 @@ pub fn execute(snapshot_id: &str, directory: &str) -> Result<()> {
     );
     println!();
 
-    // Top tables by column count
     let mut table_sizes: Vec<(&str, usize)> = snapshot
         .schema
         .tables
@@ -81,7 +80,6 @@ pub fn execute(snapshot_id: &str, directory: &str) -> Result<()> {
     }
     println!();
 
-    // Column type distribution
     let mut type_counts: HashMap<String, usize> = HashMap::new();
     for table in &snapshot.schema.tables {
         for column in &table.columns {
