@@ -152,7 +152,10 @@ fn render_mermaid(
     }
 
     for (from, to, column, ref_column) in relationships {
-        println!("    {} ||--o{{ {} : {} -> {}", to, from, ref_column, column);
+        println!(
+            "    {} ||--o{{ {} : \"{} to {}\"",
+            to, from, ref_column, column
+        );
     }
 }
 
@@ -165,7 +168,7 @@ fn render_dot(relationships: &HashSet<(String, String, String, String)>) {
 
     for (from, to, column, ref_column) in relationships {
         println!(
-            "    \"{}\" -> \"{}\" [label=\"{}→{}\"];",
+            "    \"{}\" -> \"{}\" [label=\"{} to {}\"];",
             from, to, column, ref_column
         );
     }
