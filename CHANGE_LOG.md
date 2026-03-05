@@ -1,0 +1,86 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [0.2.0] - 2026-03-05
+
+### Added
+
+- **History Command**: Display timeline view of all snapshots with metadata
+- **Show Command**: Inspect detailed snapshot content including tables, columns, indexes, and foreign keys
+- **Summary Command**: Display statistical overview of schema with column counts and type distribution
+- **Graph Command**: Visualize table relationships based on foreign keys
+  - Support for text (ASCII tree) format
+  - Support for Mermaid ER diagram format
+  - Support for Graphviz DOT format
+- **Export Command**: Export snapshots to various formats
+  - SQL CREATE statements export
+  - JSON format export
+  - YAML format export
+- **Validate Command**: Check schema for common issues
+  - Detect duplicate table names
+  - Detect duplicate column names
+  - Detect missing primary keys
+  - Validate foreign key references
+  - Validate index references
+- **Tag Command**: Label snapshots with meaningful names for easier reference
+  - Tag storage in tags.json file
+  - Support for tagging by snapshot ID, filename, or "latest"
+- **Driver Auto-detection**: Automatically detect database driver from connection string
+  - Support for PostgreSQL (postgresql:// or postgres://)
+  - Support for MySQL (mysql://)
+  - Support for SQLite (sqlite:// or file:)
+  - Support for MS SQL Server (mssql:// or sqlserver://)
+
+### Changed
+
+- Made `--driver` flag optional for `snapshot` and `status` commands
+- Improved graph visualization to handle closure tables and complex relationships
+- Enhanced error messages with colored output
+
+### Fixed
+
+- Fixed clippy warnings related to wildcard pattern matching
+- Improved snapshot ID resolution logic across all commands
+
+## [0.1.0] - 2026-03-01
+
+### Added
+
+- **Snapshot Command**: Capture database schema at any point in time
+- **Diff Command**: Compare two schema snapshots and display differences
+  - Support for text format output
+  - Support for JSON format output
+- **Migrate Command**: Generate SQL migration scripts from schema diffs
+- **Status Command**: Check if database has drifted from latest snapshot
+- **List Command**: Display all available snapshots
+- PostgreSQL introspection support
+  - Tables, columns, indexes, foreign keys
+  - Data types, nullability, defaults
+- PostgreSQL migration generation
+  - CREATE/DROP TABLE statements
+  - ALTER TABLE for modifications
+  - CREATE/DROP INDEX statements
+  - ADD/DROP CONSTRAINT for foreign keys
+
+### Core Features
+
+- Modular crate architecture:
+  - `schemagit-core`: Core data structures
+  - `schemagit-introspector`: Database introspection
+  - `schemagit-snapshot`: Snapshot management
+  - `schemagit-diff`: Schema comparison
+  - `schemagit-migration`: Migration generation
+  - `schemagit-cli`: Command-line interface
+- Snapshot storage in JSON format with timestamps
+- Colored terminal output for better readability
+- Comprehensive error handling with anyhow
+
+[Unreleased]: https://github.com/yourusername/schemagit/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/yourusername/schemagit/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/yourusername/schemagit/releases/tag/v0.1.0

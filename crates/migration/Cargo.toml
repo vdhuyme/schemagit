@@ -1,0 +1,8 @@
+[package]
+name = "schemagit-migration"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+schemagit-core = { path = "../core" }
+schemagit-diff = { path = "../diff" }
