@@ -13,3 +13,4 @@ tokio-util = { version = "0.7", features = ["compat"] }
 futures-util = "0.3"
 url = "2"
 tiberius = { version = "0.12", default-features = false, features = ["rustls"] }
+percent-encoding = "2"

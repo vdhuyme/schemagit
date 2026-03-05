@@ -1,4 +1,5 @@
 use crate::{Introspector, IntrospectorError, IntrospectorResult};
+use percent_encoding::percent_decode_str;
 use schemagit_core::{Column, DatabaseSchema, ForeignKey, Index, Table};
 use tiberius::{AuthMethod, Client, Config, EncryptionLevel, Row};
 use tokio::net::TcpStream;
@@ -109,10 +110,36 @@ impl MssqlIntrospector {
             .map(|row| {
                 let nullable: Option<&str> = row.get("is_nullable");
                 let data_type: Option<&str> = row.get("data_type");
-                let char_max_len: Option<i32> = row.get("char_max_len");
-                let numeric_precision: Option<i32> =
-                    row.get("numeric_precision");
-                let numeric_scale: Option<i32> = row.get("numeric_scale");
+
+                // INFORMATION_SCHEMA returns these with MSSQL-native types that
+                // don't always map to i32. CHARACTER_MAXIMUM_LENGTH is int
+                // (i32), but NUMERIC_PRECISION and NUMERIC_SCALE come back as
+                // tinyint (u8) from MSSQL, so we try both and coerce to i32.
+                let char_max_len: Option<i32> = row
+                    .get::<i32, _>("char_max_len")
+                    .or_else(|| {
+                        row.get::<u8, _>("char_max_len").map(|v| v as i32)
+                    })
+                    .or_else(|| {
+                        row.get::<i64, _>("char_max_len").map(|v| v as i32)
+                    });
+
+                let numeric_precision: Option<i32> = row
+                    .get::<u8, _>("numeric_precision")
+                    .map(|v| v as i32)
+                    .or_else(|| row.get::<i32, _>("numeric_precision"))
+                    .or_else(|| {
+                        row.get::<i64, _>("numeric_precision").map(|v| v as i32)
+                    });
+
+                let numeric_scale: Option<i32> = row
+                    .get::<i32, _>("numeric_scale")
+                    .or_else(|| {
+                        row.get::<u8, _>("numeric_scale").map(|v| v as i32)
+                    })
+                    .or_else(|| {
+                        row.get::<i64, _>("numeric_scale").map(|v| v as i32)
+                    });
 
                 Column {
                     name: row
@@ -379,6 +406,12 @@ fn parse_mssql_url(url_str: &str) -> IntrospectorResult<Config> {
             "Missing password in connection string".to_string(),
         )
     })?;
+
+    // Percent-decode username and password to allow special characters.
+    let password = percent_decode_str(password)
+        .decode_utf8()
+        .map_err(|e| IntrospectorError::ConnectionError(e.to_string()))?
+        .to_string();
 
     let mut config = Config::new();
     config.host(host);
