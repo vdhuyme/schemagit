@@ -5,9 +5,8 @@ use schemagit_diff::diff_schemas;
 use schemagit_migration::create_generator;
 use schemagit_snapshot::SnapshotManager;
 use std::collections::HashSet;
-use std::fs;
 
-use super::utils;
+use super::{output, utils};
 
 /// Execute the migrate command.
 pub fn execute(
@@ -62,19 +61,15 @@ pub fn execute(
     verify_duplicate_operations(&statements)?;
     let migration = statements.join("\n\n");
 
-    // Output migration
-    match output_file {
-        Some(path) => {
-            utils::prepare_output_path(path, yes, no_create_dir)?;
-            fs::write(path, &migration)
-                .context("Failed to write migration file")?;
-            println!("{}", format!("✓ Migration saved: {}", path).green());
-        }
-        None => {
-            println!("\n{}", "=== Migration SQL ===".bold());
-            println!("{}", migration);
-        }
-    }
+    let rendered =
+        format!("\n{}\n{}\n", "=== Migration SQL ===".bold(), migration);
+    output::write_or_stdout(
+        &rendered,
+        output_file,
+        yes,
+        no_create_dir,
+        "Migration",
+    )?;
 
     Ok(())
 }

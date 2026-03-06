@@ -1,30 +1,39 @@
 use anyhow::{Context, Result};
-use colored::Colorize;
 use schemagit_snapshot::SnapshotManager;
 
+use super::output;
+
 /// Execute the history command.
-pub fn execute(directory: &str) -> Result<()> {
+pub fn execute(
+    directory: &str,
+    output_file: Option<&str>,
+    yes: bool,
+    no_create_dir: bool,
+) -> Result<()> {
     let manager = SnapshotManager::new(directory);
     let snapshots = manager.list().context("Failed to list snapshots")?;
 
     if snapshots.is_empty() {
-        println!(
-            "{}",
-            format!("No snapshots found in {}", directory).yellow()
-        );
+        let content = format!("No snapshots found in {}\n", directory);
+        output::write_or_stdout(
+            &content,
+            output_file,
+            yes,
+            no_create_dir,
+            "History",
+        )?;
         return Ok(());
     }
 
-    println!("{}", "Snapshot History".bold());
-    println!();
-    println!(
+    let mut content = String::new();
+    content.push_str("Snapshot History\n\n");
+    content.push_str(&format!(
         "{:<25} {:<20} {:<10} {}",
-        "ID".bold(),
-        "CREATED".bold(),
-        "TABLES".bold(),
-        "DATABASE".bold()
-    );
-    println!("{}", "-".repeat(80));
+        "ID", "CREATED", "TABLES", "DATABASE"
+    ));
+    content.push('\n');
+    content.push_str(&"-".repeat(80));
+    content.push('\n');
 
     for filename in &snapshots {
         // Extract ID from filename (e.g., "2026_03_05_071235.snapshot.json" -> "20260305071235")
@@ -35,20 +44,29 @@ pub fn execute(directory: &str) -> Result<()> {
 
         // Try to load snapshot to get metadata
         if let Ok(snapshot) = manager.load(filename) {
-            println!(
+            content.push_str(&format!(
                 "{:<25} {:<20} {:<10} {}",
-                id.cyan(),
+                id,
                 snapshot.timestamp.format("%Y-%m-%d %H:%M:%S"),
                 snapshot.schema.tables.len(),
                 snapshot.database_type
-            );
+            ));
+            content.push('\n');
         } else {
-            println!("{:<25} {} (failed to load)", id.red(), "ERROR".red());
+            content.push_str(&format!("{:<25} ERROR (failed to load)\n", id));
         }
     }
 
-    println!();
-    println!("Total: {} snapshot(s)", snapshots.len());
+    content.push('\n');
+    content.push_str(&format!("Total: {} snapshot(s)\n", snapshots.len()));
+
+    output::write_or_stdout(
+        &content,
+        output_file,
+        yes,
+        no_create_dir,
+        "History",
+    )?;
 
     Ok(())
 }

@@ -7,7 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.1] - 2026-03-10
+## [0.2.3] - 2026-03-06
+
+### Added
+
+- FEAT: Improve CLI output, snapshot validation, and documentation ([#8](https://github.com/vdhuyme/schemagit/pull/8))
+- Standardized output writing across output-producing commands with shared `-o/--output` behavior and directory creation controls (`--yes`, `--no-create-dir`)
+- Release helper script: `scripts/release.sh` for workspace version bump, commit, and tag flow
+
+### Changed
+
+- Removed custom `schemagit version` subcommand; CLI now reports version from Cargo metadata via `schemagit --version`
+- Migrated crate versioning to workspace-level metadata (`[workspace.package]`) so all crates share one source of truth
+
+### Refactored
+
+- Refactor: Apply Rust Coding Conventions and Strict Code Quality Rules ([#7](https://github.com/vdhuyme/schemagit/pull/7))
+
+### Documentation
+
+- Updated README release/versioning instructions to use `cargo-edit` (`cargo set-version --workspace --bump <patch|minor|major>`)
+
+## [0.2.1] - 2026-03-05
 
 ### Added
 
@@ -106,6 +127,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Colored terminal output for better readability
 - Comprehensive error handling with anyhow
 
-[Unreleased]: https://github.com/yourusername/schemagit/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/yourusername/schemagit/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/yourusername/schemagit/releases/tag/v0.1.0
+[Unreleased]: https://github.com/vdhuyme/schemagit/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/vdhuyme/schemagit/compare/v0.2.2...v0.2.3
+[0.2.1]: https://github.com/vdhuyme/schemagit/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/vdhuyme/schemagit/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/vdhuyme/schemagit/releases/tag/v0.1.0
