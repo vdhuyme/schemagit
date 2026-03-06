@@ -6,6 +6,8 @@ use tokio::net::TcpStream;
 use tokio_util::compat::TokioAsyncWriteCompatExt;
 use url::Url;
 
+const NULLABLE_YES: &str = "YES";
+
 /// SQL Server (MSSQL) schema introspector implementation.
 pub struct MssqlIntrospector {
     connection_string: String,
@@ -105,60 +107,7 @@ impl MssqlIntrospector {
             .await
             .map_err(|e| IntrospectorError::QueryError(e.to_string()))?;
 
-        Ok(rows
-            .iter()
-            .map(|row| {
-                let nullable: Option<&str> = row.get("is_nullable");
-                let data_type: Option<&str> = row.get("data_type");
-
-                // INFORMATION_SCHEMA returns these with MSSQL-native types that
-                // don't always map to i32. CHARACTER_MAXIMUM_LENGTH is int
-                // (i32), but NUMERIC_PRECISION and NUMERIC_SCALE come back as
-                // tinyint (u8) from MSSQL, so we try both and coerce to i32.
-                let char_max_len: Option<i32> = row
-                    .get::<i32, _>("char_max_len")
-                    .or_else(|| {
-                        row.get::<u8, _>("char_max_len").map(|v| v as i32)
-                    })
-                    .or_else(|| {
-                        row.get::<i64, _>("char_max_len").map(|v| v as i32)
-                    });
-
-                let numeric_precision: Option<i32> = row
-                    .get::<u8, _>("numeric_precision")
-                    .map(|v| v as i32)
-                    .or_else(|| row.get::<i32, _>("numeric_precision"))
-                    .or_else(|| {
-                        row.get::<i64, _>("numeric_precision").map(|v| v as i32)
-                    });
-
-                let numeric_scale: Option<i32> = row
-                    .get::<i32, _>("numeric_scale")
-                    .or_else(|| {
-                        row.get::<u8, _>("numeric_scale").map(|v| v as i32)
-                    })
-                    .or_else(|| {
-                        row.get::<i64, _>("numeric_scale").map(|v| v as i32)
-                    });
-
-                Column {
-                    name: row
-                        .get::<&str, _>("column_name")
-                        .unwrap_or_default()
-                        .to_string(),
-                    data_type: format_mssql_type(
-                        data_type.unwrap_or_default(),
-                        char_max_len,
-                        numeric_precision,
-                        numeric_scale,
-                    ),
-                    nullable: nullable == Some("YES"),
-                    default: row
-                        .get::<&str, _>("column_default")
-                        .map(|s| s.to_string()),
-                }
-            })
-            .collect())
+        Ok(rows.iter().map(Self::column_from_row).collect())
     }
 
     async fn introspect_indexes(
@@ -275,27 +224,61 @@ impl MssqlIntrospector {
             .await
             .map_err(|e| IntrospectorError::QueryError(e.to_string()))?;
 
-        Ok(rows
-            .iter()
-            .map(|row| ForeignKey {
-                name: row
-                    .get::<&str, _>("constraint_name")
-                    .unwrap_or_default()
-                    .to_string(),
-                column: row
-                    .get::<&str, _>("column_name")
-                    .unwrap_or_default()
-                    .to_string(),
-                ref_table: row
-                    .get::<&str, _>("foreign_table_name")
-                    .unwrap_or_default()
-                    .to_string(),
-                ref_column: row
-                    .get::<&str, _>("foreign_column_name")
-                    .unwrap_or_default()
-                    .to_string(),
-            })
-            .collect())
+        Ok(rows.iter().map(Self::foreign_key_from_row).collect())
+    }
+
+    fn column_from_row(row: &Row) -> Column {
+        let nullable: Option<&str> = row.get("is_nullable");
+        let data_type: Option<&str> = row.get("data_type");
+
+        // INFORMATION_SCHEMA returns these with MSSQL-native types that don't
+        // always map to i32, so we coerce common representations.
+        let char_max_len = Self::coerce_optional_i32(row, "char_max_len");
+        let numeric_precision =
+            Self::coerce_optional_i32(row, "numeric_precision");
+        let numeric_scale = Self::coerce_optional_i32(row, "numeric_scale");
+
+        Column {
+            name: row
+                .get::<&str, _>("column_name")
+                .unwrap_or_default()
+                .to_string(),
+            data_type: format_mssql_type(
+                data_type.unwrap_or_default(),
+                char_max_len,
+                numeric_precision,
+                numeric_scale,
+            ),
+            nullable: nullable == Some(NULLABLE_YES),
+            default: row.get::<&str, _>("column_default").map(str::to_string),
+        }
+    }
+
+    fn foreign_key_from_row(row: &Row) -> ForeignKey {
+        ForeignKey {
+            name: row
+                .get::<&str, _>("constraint_name")
+                .unwrap_or_default()
+                .to_string(),
+            column: row
+                .get::<&str, _>("column_name")
+                .unwrap_or_default()
+                .to_string(),
+            ref_table: row
+                .get::<&str, _>("foreign_table_name")
+                .unwrap_or_default()
+                .to_string(),
+            ref_column: row
+                .get::<&str, _>("foreign_column_name")
+                .unwrap_or_default()
+                .to_string(),
+        }
+    }
+
+    fn coerce_optional_i32(row: &Row, key: &str) -> Option<i32> {
+        row.get::<i32, _>(key)
+            .or_else(|| row.get::<u8, _>(key).map(i32::from))
+            .or_else(|| row.get::<i64, _>(key).map(|v| v as i32))
     }
 }
 

@@ -5,6 +5,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
+const SNAPSHOT_EXTENSION: &str = ".snapshot.json";
+const TIMESTAMP_FORMAT: &str = "%Y_%m_%d_%H%M%S";
+
 /// Errors that can occur during snapshot operations.
 #[derive(Debug, Error)]
 pub enum SnapshotError {
@@ -70,7 +73,7 @@ impl SnapshotManager {
     /// Generate a snapshot filename based on the current timestamp.
     fn generate_filename(&self) -> String {
         let now = Utc::now();
-        format!("{}.snapshot.json", now.format("%Y_%m_%d_%H%M%S"))
+        format!("{}{}", now.format(TIMESTAMP_FORMAT), SNAPSHOT_EXTENSION)
     }
 
     /// Get the full path for a snapshot file.
@@ -103,15 +106,7 @@ impl SnapshotManager {
     /// * `filename` - Name of the snapshot file to load
     pub fn load(&self, filename: &str) -> SnapshotResult<Snapshot> {
         let path = self.snapshot_path(filename);
-
-        if !path.exists() {
-            return Err(SnapshotError::NotFound(filename.to_string()));
-        }
-
-        let json = fs::read_to_string(&path)?;
-        let snapshot: Snapshot = serde_json::from_str(&json)?;
-
-        Ok(snapshot)
+        Self::load_snapshot_from_path(&path, filename)
     }
 
     /// Load a snapshot from an arbitrary path.
@@ -120,17 +115,7 @@ impl SnapshotManager {
     /// * `path` - Full path to the snapshot file
     pub fn load_from_path<P: AsRef<Path>>(path: P) -> SnapshotResult<Snapshot> {
         let path = path.as_ref();
-
-        if !path.exists() {
-            return Err(SnapshotError::NotFound(
-                path.to_string_lossy().to_string(),
-            ));
-        }
-
-        let json = fs::read_to_string(path)?;
-        let snapshot: Snapshot = serde_json::from_str(&json)?;
-
-        Ok(snapshot)
+        Self::load_snapshot_from_path(path, &path.to_string_lossy())
     }
 
     /// List all snapshot files in the snapshot directory.
@@ -151,7 +136,7 @@ impl SnapshotManager {
             if path.is_file() {
                 if let Some(filename) = path.file_name() {
                     let filename = filename.to_string_lossy().to_string();
-                    if filename.ends_with(".snapshot.json") {
+                    if filename.ends_with(SNAPSHOT_EXTENSION) {
                         snapshots.push(filename);
                     }
                 }
@@ -186,6 +171,20 @@ impl SnapshotManager {
 
         fs::remove_file(path)?;
         Ok(())
+    }
+
+    fn load_snapshot_from_path(
+        path: &Path,
+        not_found_name: &str,
+    ) -> SnapshotResult<Snapshot> {
+        if !path.exists() {
+            return Err(SnapshotError::NotFound(not_found_name.to_string()));
+        }
+
+        let json = fs::read_to_string(path)?;
+        let snapshot: Snapshot = serde_json::from_str(&json)?;
+
+        Ok(snapshot)
     }
 }
 

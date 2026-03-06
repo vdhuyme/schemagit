@@ -14,14 +14,7 @@ pub async fn execute(
     println!("{}", "Creating snapshot...".cyan());
 
     // Auto-detect driver if not specified
-    let driver = match driver {
-        Some(d) => d,
-        None => utils::detect_driver(connection).ok_or_else(|| {
-            anyhow::anyhow!(
-                "Could not auto-detect database driver from connection string. Please specify --driver explicitly."
-            )
-        })?,
-    };
+    let driver = utils::resolve_driver(driver, connection)?;
 
     println!("Using driver: {}", driver.yellow());
 

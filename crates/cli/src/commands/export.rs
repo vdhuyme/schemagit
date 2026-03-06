@@ -3,37 +3,15 @@ use colored::Colorize;
 use schemagit_core::{Column, Table};
 use schemagit_snapshot::SnapshotManager;
 
+use super::utils;
+
+const UNIQUE_PREFIX: &str = "UNIQUE ";
+const EMPTY: &str = "";
+
 /// Execute the export command.
 pub fn execute(snapshot_id: &str, directory: &str, format: &str) -> Result<()> {
     let manager = SnapshotManager::new(directory);
-
-    // Load snapshot
-    let snapshot = match snapshot_id {
-        id if id.ends_with(".snapshot.json") => manager.load(id)?,
-
-        "latest" => manager
-            .latest()
-            .context("Failed to load latest snapshot")?
-            .ok_or_else(|| {
-                anyhow::anyhow!("No snapshots found in {}", directory)
-            })?,
-
-        id => {
-            let filename = if id.len() == 14 {
-                format!(
-                    "{}_{}_{}_{}.snapshot.json",
-                    &id[0..4],
-                    &id[4..6],
-                    &id[6..8],
-                    &id[8..14]
-                )
-            } else {
-                format!("{}.snapshot.json", id)
-            };
-
-            manager.load(&filename)?
-        }
-    };
+    let snapshot = utils::resolve_snapshot(&manager, snapshot_id, directory)?;
 
     match format.to_lowercase().as_str() {
         "sql" => {
@@ -94,7 +72,7 @@ fn export_table_sql_string(table: &Table, db_type: &str) -> String {
 
     // Export indexes
     for index in &table.indexes {
-        let unique = if index.unique { "UNIQUE " } else { "" };
+        let unique = if index.unique { UNIQUE_PREFIX } else { EMPTY };
         let columns = index
             .columns
             .iter()
@@ -159,37 +137,6 @@ fn export_json(snapshot: &schemagit_snapshot::Snapshot) -> Result<()> {
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use schemagit_core::Table;
-
-    #[test]
-    fn quote_identifier_mssql() {
-        assert_eq!(quote_identifier("mssql", "users"), "[users]");
-        assert_eq!(quote_identifier("mssql", "a]b"), "[a]]b]");
-    }
-
-    #[test]
-    fn export_table_sql_string_mssql_uses_brackets() {
-        let table = Table {
-            name: "users".to_string(),
-            columns: vec![Column {
-                name: "id".to_string(),
-                data_type: "int".to_string(),
-                nullable: false,
-                default: None,
-            }],
-            indexes: vec![],
-            foreign_keys: vec![],
-        };
-
-        let sql = export_table_sql_string(&table, "mssql");
-        assert!(sql.contains("CREATE TABLE [users]"));
-        assert!(sql.contains("[id] int NOT NULL"));
-    }
-}
-
 /// Export snapshot as YAML.
 fn export_yaml(snapshot: &schemagit_snapshot::Snapshot) -> Result<()> {
     // Simple YAML-like output (without external dependency)
@@ -237,4 +184,35 @@ fn export_yaml(snapshot: &schemagit_snapshot::Snapshot) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use schemagit_core::Table;
+
+    #[test]
+    fn quote_identifier_mssql() {
+        assert_eq!(quote_identifier("mssql", "users"), "[users]");
+        assert_eq!(quote_identifier("mssql", "a]b"), "[a]]b]");
+    }
+
+    #[test]
+    fn export_table_sql_string_mssql_uses_brackets() {
+        let table = Table {
+            name: "users".to_string(),
+            columns: vec![Column {
+                name: "id".to_string(),
+                data_type: "int".to_string(),
+                nullable: false,
+                default: None,
+            }],
+            indexes: vec![],
+            foreign_keys: vec![],
+        };
+
+        let sql = export_table_sql_string(&table, "mssql");
+        assert!(sql.contains("CREATE TABLE [users]"));
+        assert!(sql.contains("[id] int NOT NULL"));
+    }
 }

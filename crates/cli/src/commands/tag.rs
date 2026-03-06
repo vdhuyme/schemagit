@@ -6,6 +6,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
+use super::utils;
+
 #[derive(Debug, Serialize, Deserialize)]
 struct TagStorage {
     tags: HashMap<String, String>,
@@ -49,28 +51,8 @@ pub fn execute(
         .context("Failed to load tags")?;
 
     // Resolve snapshot filename
-    let snapshot_filename = match snapshot_id {
-        id if id.ends_with(".snapshot.json") => id.to_string(),
-
-        "latest" => {
-            let snapshots =
-                manager.list().context("Failed to list snapshots")?;
-            snapshots
-                .last()
-                .ok_or_else(|| anyhow::anyhow!("No snapshots found"))?
-                .clone()
-        }
-
-        id if id.len() == 14 => format!(
-            "{}_{}_{}_{}.snapshot.json",
-            &id[0..4],
-            &id[4..6],
-            &id[6..8],
-            &id[8..14]
-        ),
-
-        id => format!("{}.snapshot.json", id),
-    };
+    let snapshot_filename =
+        utils::resolve_snapshot_filename(&manager, snapshot_id, directory)?;
 
     // Verify snapshot exists
     manager

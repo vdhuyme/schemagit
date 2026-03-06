@@ -1,36 +1,13 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use colored::Colorize;
 use schemagit_snapshot::SnapshotManager;
+
+use super::utils;
 
 /// Execute the show command.
 pub fn execute(snapshot_id: &str, directory: &str) -> Result<()> {
     let manager = SnapshotManager::new(directory);
-
-    let snapshot = match snapshot_id {
-        id if id.ends_with(".snapshot.json") => manager.load(id)?,
-
-        "latest" => manager
-            .latest()
-            .context("Failed to load latest snapshot")?
-            .ok_or_else(|| {
-                anyhow::anyhow!("No snapshots found in {}", directory)
-            })?,
-
-        id => {
-            let filename = match id.len() {
-                14 => format!(
-                    "{}_{}_{}_{}.snapshot.json",
-                    &id[0..4],
-                    &id[4..6],
-                    &id[6..8],
-                    &id[8..14]
-                ),
-                _ => format!("{}.snapshot.json", id),
-            };
-
-            manager.load(&filename)?
-        }
-    };
+    let snapshot = utils::resolve_snapshot(&manager, snapshot_id, directory)?;
 
     println!("{}", "=== Snapshot Details ===".bold().cyan());
     println!();

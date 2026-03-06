@@ -2,6 +2,9 @@ use crate::MigrationGenerator;
 use schemagit_core::{Column, ForeignKey, Index, Table};
 use schemagit_diff::{ColumnModification, SchemaDiff, TableDiff};
 
+const UNIQUE_PREFIX: &str = "UNIQUE ";
+const EMPTY: &str = "";
+
 /// PostgreSQL migration generator.
 pub struct PostgresMigrationGenerator;
 
@@ -162,42 +165,28 @@ impl PostgresMigrationGenerator {
         let table = Self::quote_identifier(table_name);
         let column = Self::quote_identifier(&col_mod.column_name);
 
-        // Change data type
         if old.data_type != new.data_type {
-            statements.push(format!(
-                "ALTER TABLE {} ALTER COLUMN {} TYPE {};",
-                table, column, new.data_type
+            statements.push(Self::alter_column_type(
+                &table,
+                &column,
+                &new.data_type,
             ));
         }
 
-        // Change nullability
         if old.nullable != new.nullable {
-            if new.nullable {
-                statements.push(format!(
-                    "ALTER TABLE {} ALTER COLUMN {} DROP NOT NULL;",
-                    table, column
-                ));
-            } else {
-                statements.push(format!(
-                    "ALTER TABLE {} ALTER COLUMN {} SET NOT NULL;",
-                    table, column
-                ));
-            }
+            statements.push(Self::alter_column_nullability(
+                &table,
+                &column,
+                new.nullable,
+            ));
         }
 
-        // Change default
         if old.default != new.default {
-            if let Some(ref default) = new.default {
-                statements.push(format!(
-                    "ALTER TABLE {} ALTER COLUMN {} SET DEFAULT {};",
-                    table, column, default
-                ));
-            } else {
-                statements.push(format!(
-                    "ALTER TABLE {} ALTER COLUMN {} DROP DEFAULT;",
-                    table, column
-                ));
-            }
+            statements.push(Self::alter_column_default(
+                &table,
+                &column,
+                new.default.as_deref(),
+            ));
         }
 
         statements
@@ -205,7 +194,7 @@ impl PostgresMigrationGenerator {
 
     /// Generate CREATE INDEX statement.
     fn generate_create_index(&self, table_name: &str, index: &Index) -> String {
-        let unique = if index.unique { "UNIQUE " } else { "" };
+        let unique = if index.unique { UNIQUE_PREFIX } else { EMPTY };
         let columns = index
             .columns
             .iter()
@@ -259,6 +248,50 @@ impl PostgresMigrationGenerator {
     /// Quote an identifier for PostgreSQL.
     fn quote_identifier(name: &str) -> String {
         format!("\"{}\"", name)
+    }
+
+    fn alter_column_type(table: &str, column: &str, data_type: &str) -> String {
+        format!(
+            "ALTER TABLE {} ALTER COLUMN {} TYPE {};",
+            table, column, data_type
+        )
+    }
+
+    fn alter_column_nullability(
+        table: &str,
+        column: &str,
+        nullable: bool,
+    ) -> String {
+        if nullable {
+            return format!(
+                "ALTER TABLE {} ALTER COLUMN {} DROP NOT NULL;",
+                table, column
+            );
+        }
+
+        format!(
+            "ALTER TABLE {} ALTER COLUMN {} SET NOT NULL;",
+            table, column
+        )
+    }
+
+    fn alter_column_default(
+        table: &str,
+        column: &str,
+        default: Option<&str>,
+    ) -> String {
+        match default {
+            Some(default) => format!(
+                "ALTER TABLE {} ALTER COLUMN {} SET DEFAULT {};",
+                table, column, default
+            ),
+            None => {
+                format!(
+                    "ALTER TABLE {} ALTER COLUMN {} DROP DEFAULT;",
+                    table, column
+                )
+            }
+        }
     }
 }
 

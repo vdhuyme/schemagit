@@ -2,6 +2,11 @@ use schemagit_core::{Column, DatabaseSchema, ForeignKey, Index, Table};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
+const NO_CHANGES_MESSAGE: &str = "No changes detected";
+const TABLES_ADDED_LABEL: &str = "Tables Added";
+const TABLES_REMOVED_LABEL: &str = "Tables Removed";
+const TABLES_MODIFIED_LABEL: &str = "Tables Modified";
+
 /// Represents a difference in a table structure.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TableDiff {
@@ -44,15 +49,22 @@ impl SchemaDiff {
         let mut lines = Vec::new();
 
         if !self.tables_added.is_empty() {
-            lines.push(format!("Tables Added: {}", self.tables_added.len()));
+            lines.push(format!(
+                "{}: {}",
+                TABLES_ADDED_LABEL,
+                self.tables_added.len()
+            ));
             for table in &self.tables_added {
                 lines.push(format!("  + {}", table.name));
             }
         }
 
         if !self.tables_removed.is_empty() {
-            lines
-                .push(format!("Tables Removed: {}", self.tables_removed.len()));
+            lines.push(format!(
+                "{}: {}",
+                TABLES_REMOVED_LABEL,
+                self.tables_removed.len()
+            ));
             for table in &self.tables_removed {
                 lines.push(format!("  - {}", table.name));
             }
@@ -60,49 +72,54 @@ impl SchemaDiff {
 
         if !self.tables_modified.is_empty() {
             lines.push(format!(
-                "Tables Modified: {}",
+                "{}: {}",
+                TABLES_MODIFIED_LABEL,
                 self.tables_modified.len()
             ));
             for table_diff in &self.tables_modified {
-                lines.push(format!("  ~ {}", table_diff.table_name));
-
-                for col in &table_diff.columns_added {
-                    lines.push(format!("      + Column: {}", col.name));
-                }
-
-                for col in &table_diff.columns_removed {
-                    lines.push(format!("      - Column: {}", col.name));
-                }
-
-                for col_mod in &table_diff.columns_modified {
-                    lines.push(format!(
-                        "      ~ Column: {}",
-                        col_mod.column_name
-                    ));
-                }
-
-                for idx in &table_diff.indexes_added {
-                    lines.push(format!("      + Index: {}", idx.name));
-                }
-
-                for idx in &table_diff.indexes_removed {
-                    lines.push(format!("      - Index: {}", idx.name));
-                }
-
-                for fk in &table_diff.foreign_keys_added {
-                    lines.push(format!("      + Foreign Key: {}", fk.name));
-                }
-
-                for fk in &table_diff.foreign_keys_removed {
-                    lines.push(format!("      - Foreign Key: {}", fk.name));
-                }
+                Self::append_table_mod_summary(&mut lines, table_diff);
             }
         }
 
         if lines.is_empty() {
-            "No changes detected".to_string()
+            NO_CHANGES_MESSAGE.to_string()
         } else {
             lines.join("\n")
+        }
+    }
+
+    fn append_table_mod_summary(
+        lines: &mut Vec<String>,
+        table_diff: &TableDiff,
+    ) {
+        lines.push(format!("  ~ {}", table_diff.table_name));
+
+        for col in &table_diff.columns_added {
+            lines.push(format!("      + Column: {}", col.name));
+        }
+
+        for col in &table_diff.columns_removed {
+            lines.push(format!("      - Column: {}", col.name));
+        }
+
+        for col_mod in &table_diff.columns_modified {
+            lines.push(format!("      ~ Column: {}", col_mod.column_name));
+        }
+
+        for idx in &table_diff.indexes_added {
+            lines.push(format!("      + Index: {}", idx.name));
+        }
+
+        for idx in &table_diff.indexes_removed {
+            lines.push(format!("      - Index: {}", idx.name));
+        }
+
+        for fk in &table_diff.foreign_keys_added {
+            lines.push(format!("      + Foreign Key: {}", fk.name));
+        }
+
+        for fk in &table_diff.foreign_keys_removed {
+            lines.push(format!("      - Foreign Key: {}", fk.name));
         }
     }
 }
