@@ -65,6 +65,14 @@ enum Commands {
         /// Output file for the migration (default: stdout)
         #[arg(short, long)]
         output: Option<String>,
+
+        /// Automatically create missing output directory
+        #[arg(long, conflicts_with = "no_create_dir")]
+        yes: bool,
+
+        /// Do not create missing output directory
+        #[arg(long = "no-create-dir", conflicts_with = "yes")]
+        no_create_dir: bool,
     },
 
     /// Check database drift against the latest snapshot
@@ -139,6 +147,14 @@ enum Commands {
         /// Output file (default: stdout)
         #[arg(short, long)]
         output: Option<String>,
+
+        /// Automatically create missing output directory
+        #[arg(long, conflicts_with = "no_create_dir")]
+        yes: bool,
+
+        /// Do not create missing output directory
+        #[arg(long = "no-create-dir", conflicts_with = "yes")]
+        no_create_dir: bool,
     },
 
     /// Export snapshot to various formats
@@ -202,11 +218,15 @@ async fn main() -> Result<()> {
             new,
             snapshot_dir,
             output,
+            yes,
+            no_create_dir,
         } => commands::migrate::execute(
             &old,
             &new,
             &snapshot_dir,
             output.as_deref(),
+            yes,
+            no_create_dir,
         ),
 
         Commands::Status {
@@ -240,11 +260,15 @@ async fn main() -> Result<()> {
             directory,
             format,
             output,
+            yes,
+            no_create_dir,
         } => commands::graph::execute(
             &snapshot,
             &directory,
             &format,
             output.as_deref(),
+            yes,
+            no_create_dir,
         ),
 
         Commands::Export {

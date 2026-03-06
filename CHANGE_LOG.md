@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--snapshot-dir` option for `diff` and `migrate`
 - `-o/--output` option for `graph` command
 - Snapshot metadata fields: `database_name` and `snapshot_version`
+- `--yes` and `--no-create-dir` flags for output-writing commands (`graph`, `migrate`)
 
 ### Improved
 
@@ -24,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Diff output ordering is deterministic to keep generated migration SQL stable
 - Diff detection now treats changed index and foreign key definitions as remove+add operations
 - Migration generation now verifies table/column/foreign key/index references before output
+- Output file UX now supports interactive directory creation prompts and non-interactive-safe failures
 
 ### Fixed
 

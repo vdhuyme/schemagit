@@ -1,5 +1,7 @@
 use anyhow::{Context, Result};
 use schemagit_snapshot::{Snapshot, SnapshotManager};
+use std::fs;
+use std::io::{self, IsTerminal, Write};
 use std::path::Path;
 
 const POSTGRESQL_SCHEME: &str = "postgresql://";
@@ -20,6 +22,9 @@ const LATEST_SNAPSHOT_KEY: &str = "latest";
 const PREVIOUS_SNAPSHOT_KEY: &str = "previous";
 const AUTO_DETECT_DRIVER_ERROR: &str =
     "Could not auto-detect database driver from connection string. Please specify --driver explicitly.";
+const OUTPUT_DIRECTORY_MISSING_ERROR: &str = "Output directory does not exist";
+const OPERATION_CANCELLED_MESSAGE: &str =
+    "Operation cancelled. Output directory was not created.";
 
 /// Detect database driver from connection string.
 pub fn detect_driver(connection_string: &str) -> Option<String> {
@@ -100,6 +105,96 @@ pub fn resolve_driver(
         Some(driver) => Ok(driver),
         None => detect_driver(connection)
             .ok_or_else(|| anyhow::anyhow!(AUTO_DETECT_DRIVER_ERROR)),
+    }
+}
+
+pub fn prepare_output_path(
+    output_path: &str,
+    yes: bool,
+    no_create_dir: bool,
+) -> Result<()> {
+    if yes && no_create_dir {
+        return Err(anyhow::anyhow!(
+            "--yes and --no-create-dir cannot be used together"
+        ));
+    }
+
+    let path = Path::new(output_path);
+    let Some(parent) = path.parent() else {
+        return Ok(());
+    };
+
+    if parent.as_os_str().is_empty() {
+        return Ok(());
+    }
+
+    if parent.exists() {
+        if parent.is_dir() {
+            return Ok(());
+        }
+
+        return Err(anyhow::anyhow!(
+            "Output path parent exists but is not a directory: {}",
+            parent.display()
+        ));
+    }
+
+    if yes {
+        fs::create_dir_all(parent)?;
+        return Ok(());
+    }
+
+    if no_create_dir {
+        return Err(anyhow::anyhow!(
+            "{}: {}",
+            OUTPUT_DIRECTORY_MISSING_ERROR,
+            parent.display()
+        ));
+    }
+
+    if !is_interactive_terminal() {
+        return Err(anyhow::anyhow!(
+            "{}: {}",
+            OUTPUT_DIRECTORY_MISSING_ERROR,
+            parent.display()
+        ));
+    }
+
+    if prompt_create_directory(parent)? {
+        fs::create_dir_all(parent)?;
+        return Ok(());
+    }
+
+    Err(anyhow::anyhow!(OPERATION_CANCELLED_MESSAGE))
+}
+
+fn is_interactive_terminal() -> bool {
+    io::stdin().is_terminal() && io::stdout().is_terminal()
+}
+
+fn prompt_create_directory(path: &Path) -> Result<bool> {
+    let mut stdout = io::stdout();
+    writeln!(
+        stdout,
+        "Output directory \"{}\" does not exist.",
+        path.display()
+    )?;
+
+    loop {
+        write!(stdout, "Do you want to create it? (y/n): ")?;
+        stdout.flush()?;
+
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        let normalized = input.trim().to_ascii_lowercase();
+
+        match normalized.as_str() {
+            "y" | "yes" => return Ok(true),
+            "n" | "no" => return Ok(false),
+            _ => {
+                writeln!(stdout, "Please answer with 'y'/'yes' or 'n'/'no'.")?;
+            }
+        }
     }
 }
 

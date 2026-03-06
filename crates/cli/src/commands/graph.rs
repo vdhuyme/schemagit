@@ -12,6 +12,8 @@ pub fn execute(
     directory: &str,
     format: &str,
     output_file: Option<&str>,
+    yes: bool,
+    no_create_dir: bool,
 ) -> Result<()> {
     let manager = SnapshotManager::new(directory);
     let snapshot = utils::resolve_snapshot(&manager, snapshot_id, directory)?;
@@ -49,6 +51,7 @@ pub fn execute(
 
     match output_file {
         Some(path) => {
+            utils::prepare_output_path(path, yes, no_create_dir)?;
             fs::write(path, graph)?;
             println!("{}", format!("✓ Graph saved: {}", path).green());
         }

@@ -157,14 +157,14 @@ schemagit summary <snapshot-id> [-d <directory>]
 schemagit validate <snapshot-id> [-d <directory>]
 
 # Visualize table relationships
-schemagit graph <snapshot-id> --format <text|mermaid|dot> [-d <directory>] [-o <output-file>]
+schemagit graph <snapshot-id> --format <text|mermaid|dot> [-d <directory>] [-o <output-file>] [--yes|--no-create-dir]
 ```
 
 ### Migration
 
 ```bash
 # Generate migration SQL
-schemagit migrate <old> <new> [--snapshot-dir <dir>] [-o <output-file>]
+schemagit migrate <old> <new> [--snapshot-dir <dir>] [-o <output-file>] [--yes|--no-create-dir]
 ```
 
 ### Export
@@ -210,6 +210,9 @@ schemagit export latest --format sql > docs/schema.sql
 
 # Create ER diagram (Mermaid)
 schemagit graph latest --format mermaid -o docs/schema.mmd
+
+# Non-interactive/CI-safe directory creation
+schemagit graph latest --format mermaid -o docs/schema.mmd --yes
 
 # Generate statistics
 schemagit summary latest > docs/schema-stats.txt
@@ -288,6 +291,22 @@ digraph schema {
     "posts" -> "users";
     "comments" -> "posts";
 }
+```
+
+### Output Directory Behavior
+
+When `-o/--output` is provided and the parent directory does not exist:
+
+- Default (interactive terminal): prompt to create the directory
+- Default (non-interactive, CI, or redirected input): return an error
+- `--yes`: create directory automatically without prompting
+- `--no-create-dir`: never create directory, always return an error
+
+Examples:
+
+```bash
+schemagit graph latest --format mermaid -o docs/schema.mmd --yes
+schemagit migrate latest previous -o migrations/001_init.sql --no-create-dir
 ```
 
 ---

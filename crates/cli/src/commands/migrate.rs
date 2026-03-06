@@ -6,7 +6,6 @@ use schemagit_migration::create_generator;
 use schemagit_snapshot::SnapshotManager;
 use std::collections::HashSet;
 use std::fs;
-use std::path::Path;
 
 use super::utils;
 
@@ -16,6 +15,8 @@ pub fn execute(
     new_path: &str,
     snapshot_dir: &str,
     output_file: Option<&str>,
+    yes: bool,
+    no_create_dir: bool,
 ) -> Result<()> {
     println!("{}", "Generating migration...".cyan());
 
@@ -64,7 +65,7 @@ pub fn execute(
     // Output migration
     match output_file {
         Some(path) => {
-            ensure_output_directory_exists(path)?;
+            utils::prepare_output_path(path, yes, no_create_dir)?;
             fs::write(path, &migration)
                 .context("Failed to write migration file")?;
             println!("{}", format!("✓ Migration saved: {}", path).green());
@@ -218,20 +219,6 @@ fn verify_duplicate_operations(statements: &[String]) -> Result<()> {
             return Err(anyhow::anyhow!(
                 "Migration generation error:\nDuplicate operation detected: {}",
                 key
-            ));
-        }
-    }
-
-    Ok(())
-}
-
-fn ensure_output_directory_exists(output_path: &str) -> Result<()> {
-    let path = Path::new(output_path);
-    if let Some(parent) = path.parent() {
-        if !parent.as_os_str().is_empty() && !parent.exists() {
-            return Err(anyhow::anyhow!(
-                "Output directory does not exist: {}",
-                parent.display()
             ));
         }
     }

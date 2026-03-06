@@ -422,4 +422,53 @@ mod tests {
         assert_eq!(diff.tables_added.len(), 1);
         assert_eq!(diff.tables_added[0].name, "users");
     }
+
+    #[test]
+    fn test_table_removed() {
+        let old_schema = DatabaseSchema {
+            tables: vec![Table {
+                name: "users".to_string(),
+                columns: vec![],
+                indexes: vec![],
+                foreign_keys: vec![],
+            }],
+        };
+        let new_schema = DatabaseSchema { tables: vec![] };
+
+        let diff = diff_schemas(&old_schema, &new_schema);
+        assert_eq!(diff.tables_removed.len(), 1);
+        assert_eq!(diff.tables_removed[0].name, "users");
+    }
+
+    #[test]
+    fn test_column_added() {
+        let old_schema = DatabaseSchema {
+            tables: vec![Table {
+                name: "users".to_string(),
+                columns: vec![],
+                indexes: vec![],
+                foreign_keys: vec![],
+            }],
+        };
+        let new_schema = DatabaseSchema {
+            tables: vec![Table {
+                name: "users".to_string(),
+                columns: vec![Column {
+                    name: "id".to_string(),
+                    data_type: "INTEGER".to_string(),
+                    nullable: false,
+                    default: None,
+                }],
+                indexes: vec![],
+                foreign_keys: vec![],
+            }],
+        };
+
+        let diff = diff_schemas(&old_schema, &new_schema);
+        assert_eq!(diff.tables_modified.len(), 1);
+        let table_diff = &diff.tables_modified[0];
+        assert_eq!(table_diff.table_name, "users");
+        assert_eq!(table_diff.columns_added.len(), 1);
+        assert_eq!(table_diff.columns_added[0].name, "id");
+    }
 }
