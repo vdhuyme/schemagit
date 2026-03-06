@@ -1,60 +1,71 @@
 # Schemagit
 
-**Database schema versioning and inspection CLI tool**
-
-Track database schema changes like you track code with Git.
+Database schema versioning and inspection CLI.
+Track schema changes with a Git-like workflow.
 
 ---
 
-## Table of Contents
+## Table Of Contents
 
-- [Features](#features)
+- [Highlights](#highlights)
+- [Current Support](#current-support)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
-- [Command Reference](#command-reference)
-- [Usage Examples](#usage-examples)
-- [Snapshot ID Formats](#snapshot-id-formats)
-- [Supported Databases](#supported-databases)
+- [Commands](#commands)
+- [Snapshot Input Resolution](#snapshot-input-resolution)
+- [Output File Behavior](#output-file-behavior)
+- [Examples](#examples)
 - [Output Formats](#output-formats)
 - [Architecture](#architecture)
 - [Contributing](#contributing)
+- [Roadmap](#roadmap)
 - [License](#license)
 
 ---
 
-## Features
+## Highlights
 
-Schemagit is a powerful CLI tool for managing database schema versions, inspired by Git's workflow.
+- Snapshot live database schema into JSON files.
+- Compare snapshots with deterministic diff output.
+- Generate SQL migrations from schema diffs.
+- Validate schema integrity and common modeling issues.
+- Render relationship graphs in `text`, `mermaid`, and `dot`.
+- Resolve snapshot references consistently:
+  - file path
+  - filename
+  - timestamp ID
+  - `latest`
+  - `previous`
+- Safe output writing with automation flags for CI:
+  - `--yes`
+  - `--no-create-dir`
 
-### Core Features
+---
 
-- **Snapshot** - Capture database schema at any point in time
-- **Diff** - Compare schemas and see exactly what changed
-- **Migrate** - Auto-generate SQL migration scripts from diffs
-- **Status** - Check if your database has drifted from the latest snapshot
-- **List** - View all your schema snapshots
+## Current Support
 
-### Advanced Features
+| Database             | Status          | Driver     |
+| -------------------- | --------------- | ---------- |
+| PostgreSQL           | Fully supported | `postgres` |
+| Microsoft SQL Server | Fully supported | `mssql`    |
+| MySQL                | Planned         | `mysql`    |
+| SQLite               | Planned         | `sqlite`   |
 
-- **History** - Timeline view of all snapshots
-- **Show** - Detailed inspection of any snapshot
-- **Summary** - Statistical overview of your schema
-- **Graph** - Visualize table relationships (text/mermaid/dot)
-- **Export** - Export snapshots to SQL, JSON, or YAML
-- **Validate** - Detect schema problems and best practice violations
-- **Tag** - Label snapshots with meaningful names
-- **Auto-detect** - Automatically detect database driver from connection string
+Notes:
+
+- MSSQL introspection and migration generation are fully supported.
+- MySQL/SQLite command-level flags exist, but introspection/migration are not yet complete.
 
 ---
 
 ## Installation
 
-### Prerequisites
+### Requirements
 
-- Rust 1.70 or later
-- Cargo (comes with Rust)
+- Rust 1.70+
+- Cargo
 
-### Build from Source
+### Build
 
 ```bash
 git clone https://github.com/yourusername/schemagit.git
@@ -62,271 +73,144 @@ cd schemagit
 cargo build --release
 ```
 
-The binary will be available at `target/release/schemagit` (or `schemagit.exe` on Windows).
+Binary output:
 
-### Add to PATH
-
-**Linux/macOS:**
-
-```bash
-sudo cp target/release/schemagit /usr/local/bin/
-```
-
-**Windows:**
-Copy `target/release/schemagit.exe` to a directory in your PATH.
+- Windows: `target/release/schemagit.exe`
+- Linux/macOS: `target/release/schemagit`
 
 ---
 
 ## Quick Start
 
-### 1. Take a snapshot
+### 1. Create a snapshot
 
 ```bash
-# Auto-detect driver from connection string
-schemagit snapshot -c "postgresql://user:password@localhost/mydb"
+# PostgreSQL (auto-detect driver)
+schemagit snapshot -c "postgresql://user:password@localhost:5432/mydb"
 
-# Or specify driver explicitly
-schemagit snapshot -d postgres -c "postgresql://user:password@localhost/mydb"
+# MSSQL (explicit driver)
+schemagit snapshot -d mssql -c "mssql://sa:password@localhost:1433/mydb"
 ```
 
-### 2. Make changes to your database
+### 2. Apply schema changes in DB
 
 ```sql
--- Make some schema changes
-ALTER TABLE users ADD COLUMN phone VARCHAR(20);
-CREATE TABLE orders (...);
+ALTER TABLE users ADD email NVARCHAR(255);
+CREATE INDEX idx_users_email ON users(email);
 ```
 
-### 3. Take another snapshot
+### 3. Create another snapshot
 
 ```bash
-schemagit snapshot -c "postgresql://user:password@localhost/mydb"
+schemagit snapshot -d mssql -c "mssql://sa:password@localhost:1433/mydb"
 ```
 
-### 4. Compare snapshots
+### 4. Diff
 
 ```bash
-schemagit diff old.snapshot.json new.snapshot.json
+schemagit diff previous latest
 ```
 
 ### 5. Generate migration
 
 ```bash
-schemagit migrate old.snapshot.json new.snapshot.json -o migration.sql
+schemagit migrate previous latest -o ./migrations/001_init.sql --yes
 ```
 
 ---
 
-## Command Reference
+## Commands
 
 ### Snapshot Management
 
 ```bash
-# Take a snapshot
+# Capture schema snapshot
 schemagit snapshot -c <connection-string> [-d <driver>] [-o <output-dir>]
 
-# List all snapshots
+# Detailed list with metadata
 schemagit list [-d <directory>]
 
-# List snapshot IDs only
+# IDs only (timestamp list)
 schemagit snapshots [-d <directory>]
 
-# Show snapshot history
+# Timeline view
 schemagit history [-d <directory>]
 
-# Show detailed snapshot info
-schemagit show <snapshot-id> [-d <directory>]
+# Detailed snapshot content
+schemagit show <snapshot> [-d <directory>]
 
-# Tag a snapshot
-schemagit tag <snapshot-id> <tag-name> [-d <directory>]
+# Schema summary stats
+schemagit summary <snapshot> [-d <directory>]
+
+# Validate schema issues
+schemagit validate <snapshot> [-d <directory>]
+
+# Tag snapshot
+schemagit tag <snapshot> <tag-name> [-d <directory>]
 ```
 
-### Schema Analysis
+### Comparison And Migration
 
 ```bash
-# Compare two snapshots
+# Diff snapshots
 schemagit diff <old> <new> [--snapshot-dir <dir>] [--format text|json]
 
-# Check database drift
-schemagit status -c <connection-string> [-d <driver>] [-s <snapshots-dir>]
-
-# Display schema statistics
-schemagit summary <snapshot-id> [-d <directory>]
-
-# Validate schema for issues
-schemagit validate <snapshot-id> [-d <directory>]
-
-# Visualize table relationships
-schemagit graph <snapshot-id> --format <text|mermaid|dot> [-d <directory>] [-o <output-file>] [--yes|--no-create-dir]
-```
-
-### Migration
-
-```bash
-# Generate migration SQL
+# Generate migration SQL (stdout by default)
 schemagit migrate <old> <new> [--snapshot-dir <dir>] [-o <output-file>] [--yes|--no-create-dir]
+
+# Drift check against latest snapshot
+schemagit status -c <connection-string> [-d <driver>] [-s <snapshots-dir>]
 ```
 
-### Export
+### Visualization And Export
 
 ```bash
-# Export to SQL
-schemagit export <snapshot-id> --format sql [-d <directory>]
+# Graph output (stdout by default)
+schemagit graph <snapshot> [--format text|mermaid|dot] [-d <directory>] [-o <output-file>] [--yes|--no-create-dir]
 
-# Export to JSON
-schemagit export <snapshot-id> --format json [-d <directory>]
-
-# Export to YAML
-schemagit export <snapshot-id> --format yaml [-d <directory>]
+# Export snapshot
+schemagit export <snapshot> --format <sql|json|yaml> [-d <directory>]
 ```
 
 ---
 
-## Usage Examples
+## Snapshot Input Resolution
 
-### Example 1: Production Deployment Workflow
+All snapshot-accepting commands resolve input consistently.
 
-```bash
-# Before deployment: take snapshot and tag it
-schemagit snapshot -c "postgres://prod-db/myapp"
-schemagit tag latest pre-deploy-2026-03-05
+Accepted forms:
 
-# Make changes, take new snapshot
-schemagit snapshot -c "postgres://prod-db/myapp"
-schemagit tag latest post-deploy-2026-03-05
-
-# Generate migration script
-schemagit migrate pre-deploy-2026-03-05 post-deploy-2026-03-05 -o migration.sql
-
-# Validate before applying
-schemagit validate post-deploy-2026-03-05
-```
-
-### Example 2: Documentation Generation
+1. Full path
 
 ```bash
-# Generate SQL schema documentation
-schemagit export latest --format sql > docs/schema.sql
-
-# Create ER diagram (Mermaid)
-schemagit graph latest --format mermaid -o docs/schema.mmd
-
-# Non-interactive/CI-safe directory creation
-schemagit graph latest --format mermaid -o docs/schema.mmd --yes
-
-# Generate statistics
-schemagit summary latest > docs/schema-stats.txt
+schemagit diff ./snapshots/2026_03_05_115408.snapshot.json latest
 ```
 
-### Example 3: Continuous Integration
+2. Filename
 
 ```bash
-# In CI pipeline: check for schema drift
-schemagit status -c "$DATABASE_URL"
-
-# If drift detected, fail the build
-if [ $? -ne 0 ]; then
-  echo "Schema drift detected!"
-  exit 1
-fi
+schemagit diff 2026_03_05_115408.snapshot.json latest
 ```
 
-### Example 4: Schema Validation
+3. Timestamp ID
 
 ```bash
-# Validate before deploying
-schemagit validate latest
-
-# Example output:
-# Schema validation passed!
-# No errors or warnings found.
+schemagit diff 2026_03_05_115408 latest
 ```
 
-### Example 5: Graph Visualization
-
-**Text Format:**
+4. Compact timestamp ID
 
 ```bash
-schemagit graph latest --format text
+schemagit diff 20260305115408 latest
 ```
 
-Output:
-
-```
-=== Schema Relationship Graph ===
-
-categories_closure
-  └── categories
-comments
-  └── posts
-    └── users
-```
-
-**Mermaid Format:**
+5. Aliases
 
 ```bash
-schemagit graph latest --format mermaid
+schemagit diff latest previous
 ```
 
-Output:
-
-```mermaid
-erDiagram
-    users ||--o{ posts : references
-    posts ||--o{ comments : references
-```
-
-**DOT Format:**
-
-```bash
-schemagit graph latest --format dot
-```
-
-Output:
-
-```dot
-digraph schema {
-    rankdir=LR;
-    node [shape=box];
-    "posts" -> "users";
-    "comments" -> "posts";
-}
-```
-
-### Output Directory Behavior
-
-When `-o/--output` is provided and the parent directory does not exist:
-
-- Default (interactive terminal): prompt to create the directory
-- Default (non-interactive, CI, or redirected input): return an error
-- `--yes`: create directory automatically without prompting
-- `--no-create-dir`: never create directory, always return an error
-
-Examples:
-
-```bash
-schemagit graph latest --format mermaid -o docs/schema.mmd --yes
-schemagit migrate latest previous -o migrations/001_init.sql --no-create-dir
-```
-
----
-
-## Snapshot ID Formats
-
-Snapshots can be referenced in multiple ways:
-
-| Format            | Example                                       | Description                 |
-| ----------------- | --------------------------------------------- | --------------------------- |
-| **latest**        | `latest`                                      | Most recent snapshot        |
-| **previous**      | `previous`                                    | Snapshot before latest      |
-| **Full filename** | `2026_03_05_072538.snapshot.json`             | Complete filename           |
-| **Timestamp ID**  | `2026_03_05_072538`                           | Snapshot timestamp ID       |
-| **Short ID**      | `20260305072538`                              | Timestamp-based ID          |
-| **Full path**     | `./snapshots/2026_03_05_072538.snapshot.json` | Absolute/relative file path |
-
-All snapshot-accepting commands resolve these formats consistently.
-
-You can also override the snapshot directory for `diff` and `migrate`:
+Custom snapshot directory:
 
 ```bash
 schemagit diff latest previous --snapshot-dir ./db/snapshots
@@ -335,168 +219,151 @@ schemagit migrate latest previous --snapshot-dir ./db/snapshots -o ./migrations/
 
 ---
 
-## Supported Databases
+## Output File Behavior
 
-| Database             | Status          | Driver Name |
-| -------------------- | --------------- | ----------- |
-| PostgreSQL           | Fully supported | `postgres`  |
-| MySQL                | Planned         | `mysql`     |
-| SQLite               | Planned         | `sqlite`    |
-| Microsoft SQL Server | Fully supported | `mssql`     |
+Applies to commands using `-o/--output` (`graph`, `migrate`).
+
+When output parent directory does not exist:
+
+1. `--yes`
+
+- Create directory automatically.
+- No prompt.
+
+2. `--no-create-dir`
+
+- Do not create.
+- Return clear error.
+
+3. Default behavior
+
+- Interactive terminal: ask for confirmation.
+- Non-interactive (CI, redirected input): fail without prompt.
+
+Examples:
+
+```bash
+# Auto-create output directory
+schemagit graph latest --format mermaid -o docs/schema.mmd --yes
+
+# Strict mode
+schemagit migrate previous latest -o ./migrations/001_init.sql --no-create-dir
+```
+
+---
+
+## Examples
+
+### MSSQL Workflow
+
+```bash
+# Snapshot current schema
+schemagit snapshot -d mssql -c "mssql://sa:password@localhost:1433/schemagit"
+
+# Compare snapshots
+schemagit diff previous latest --format text
+
+# Generate migration script
+schemagit migrate previous latest -o ./migrations/002_change.sql --yes
+
+# Render Mermaid graph to file
+schemagit graph latest --format mermaid -o ./docs/schema.mmd --yes
+```
+
+### CI Workflow
+
+```bash
+# Fail fast on drift
+schemagit status -d mssql -c "$DATABASE_URL"
+
+# Non-interactive output writing
+schemagit migrate previous latest -o ./artifacts/migration.sql --yes
+```
+
+### Validation And Export
+
+```bash
+schemagit validate latest
+schemagit export latest --format sql > schema.sql
+schemagit export latest --format json > schema.json
+```
 
 ---
 
 ## Output Formats
 
-### Graph Formats
+### Graph
 
-**Text** - ASCII tree representation
+- `text`: ASCII tree
+- `mermaid`: Mermaid ER diagram
+- `dot`: Graphviz DOT
 
-```
-users
- └── orders
-      └── order_items
-```
+### Export
 
-**Mermaid** - ER diagram syntax
-
-```mermaid
-erDiagram
-  users ||--o{ orders : has
-  orders ||--o{ order_items : contains
-```
-
-**DOT** - Graphviz format
-
-```dot
-digraph schema {
-  users -> orders;
-  orders -> order_items;
-}
-```
-
-### Export Formats
-
-- **SQL** - CREATE TABLE statements with indexes and foreign keys
-- **JSON** - Complete snapshot with metadata
-- **YAML** - Human-readable structured format
+- `sql`: DDL-style schema export
+- `json`: full snapshot metadata + schema
+- `yaml`: readable structured export
 
 ---
 
 ## Architecture
 
-Schemagit is built as a modular Rust workspace with the following crates:
+Workspace layout:
 
-```
+```text
 schemagit/
-├── crates/
-│   ├── cli/           # Command-line interface
-│   ├── core/          # Core data structures (Table, Column, etc.)
-│   ├── introspector/  # Database introspection (postgres, mysql, etc.)
-│   ├── snapshot/      # Snapshot management and storage
-│   ├── diff/          # Schema comparison logic
-│   └── migration/     # SQL migration generation
-└── snapshots/         # Default snapshot storage directory
+  crates/
+    cli/          # CLI entrypoints and command wiring
+    core/         # Shared schema structures (table/column/index/fk)
+    introspector/ # Database-specific introspection
+    snapshot/     # Snapshot serialization, loading, validation
+    diff/         # Schema diff engine
+    migration/    # SQL migration generators
+  snapshots/      # Default snapshot storage
 ```
 
-### Design Principles
+Design principles:
 
-- **Modular**: Each crate has a single, well-defined responsibility
-- **Type-safe**: Leverages Rust's type system for correctness
-- **Extensible**: Easy to add support for new databases
-- **Fast**: Compiled binary with minimal runtime overhead
-- **Reliable**: Comprehensive error handling
+- Modular crates with clear boundaries
+- Strong typing and explicit error handling
+- Deterministic output for reproducible automation
+- Backward-compatible snapshot metadata evolution
 
 ---
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-### Development Setup
-
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/schemagit.git
-cd schemagit
-
-# Build in debug mode
 cargo build
-
-# Run tests
+cargo fmt
 cargo test
-
-# Run clippy for linting
 cargo clippy --all-targets --all-features -- -D warnings
-
-# Run with debug output
-cargo run -- snapshot -c "postgresql://localhost/test"
 ```
 
-### Code Guidelines
-
-- Follow Rust standard style (use `rustfmt`)
-- Write tests for new features
-- Update documentation
-- Ensure all tests pass before submitting PR
-- Follow the existing code structure
-
-### Reporting Issues
-
-Please use GitHub Issues to report bugs or request features. Include:
-
-- Steps to reproduce the issue
-- Expected behavior
-- Actual behavior
-- Schemagit version
-- Operating system and version
-
----
-
-## Documentation
-
-- [CHANGE_LOG.md](CHANGE_LOG.md) - Version history and changes
-- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) - Community guidelines
-- [LICENSE](LICENSE) - MIT License
-
----
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## Acknowledgments
-
-- Inspired by Git's simple and powerful workflow
-- Built with [Rust](https://www.rust-lang.org/) for performance and safety
-- Uses [SQLx](https://github.com/launchbadge/sqlx) for database connectivity
-- Uses [Clap](https://github.com/clap-rs/clap) for CLI parsing
+Please include tests and documentation updates in your pull request.
 
 ---
 
 ## Roadmap
 
-### Near-term
+### Near Term
 
-- Support for MySQL database introspection and migration
-- Support for SQLite database introspection and migration
-- Support for MS SQL Server database introspection and migration
+- MySQL introspection and migration parity
+- SQLite introspection and migration parity
 - Snapshot compression (gzip)
-- Performance optimizations for large schemas
+- Performance tuning for very large schemas
 
-### Long-term
+### Long Term
 
 - Interactive diff viewer
-- Web UI for visualization
+- Web visualization UI
 - Plugin system for custom drivers
-- Schema rollback capabilities
-- Multi-database comparison
-- Schema diff visualization in CI/CD pipelines
+- Rollback and forward planning enhancements
 
 ---
 
-**Made with Rust by the Schemagit team**
+## License
 
-[Report Bug](https://github.com/yourusername/schemagit/issues) | [Request Feature](https://github.com/yourusername/schemagit/issues) | [Documentation](https://github.com/yourusername/schemagit/wiki)
+MIT. See `LICENSE` for details.
+
+---
