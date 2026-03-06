@@ -1,15 +1,40 @@
 [workspace]
 members = [
-    "crates/cli",
-    "crates/core",
-    "crates/introspector",
-    "crates/diff",
-    "crates/migration",
-    "crates/snapshot"
+"crates/cli",
+"crates/core",
+"crates/introspector",
+"crates/diff",
+"crates/migration",
+"crates/snapshot"
 ]
 
 resolver = "2"
 
 [workspace.package]
+name = "schemagit"
 version = "0.2.3"
-edition = "2021"
+edition = "2024"
+
+authors = ["Võ Đức Huy"]
+description = "Database schema versioning and inspection CLI tool. Track database schema changes like you track code with Git."
+
+license = "MIT"
+readme = "README.md"
+
+repository = "https://github.com/vdhuyme/schemagit"
+homepage = "https://github.com/vdhuyme/schemagit"
+documentation = "https://docs.rs/schemagit"
+
+keywords = [
+    "database",
+    "schema",
+    "migration",
+    "versioning",
+    "cli"
+]
+
+categories = [
+    "command-line-utilities",
+    "database",
+    "development-tools"
+]
