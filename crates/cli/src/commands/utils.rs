@@ -20,8 +20,7 @@ const DRIVER_MSSQL: &str = "mssql";
 const SNAPSHOT_SUFFIX: &str = ".snapshot.json";
 const LATEST_SNAPSHOT_KEY: &str = "latest";
 const PREVIOUS_SNAPSHOT_KEY: &str = "previous";
-const AUTO_DETECT_DRIVER_ERROR: &str =
-    "Could not auto-detect database driver from connection string. Please specify --driver explicitly.";
+const AUTO_DETECT_DRIVER_ERROR: &str = "Could not auto-detect database driver from connection string. Please specify --driver explicitly.";
 const OUTPUT_DIRECTORY_MISSING_ERROR: &str = "Output directory does not exist";
 const OPERATION_CANCELLED_MESSAGE: &str =
     "Operation cancelled. Output directory was not created.";
