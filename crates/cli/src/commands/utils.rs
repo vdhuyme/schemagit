@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use schemagit_snapshot::{Snapshot, SnapshotManager};
+use std::path::Path;
 
 const POSTGRESQL_SCHEME: &str = "postgresql://";
 const POSTGRES_SCHEME: &str = "postgres://";
@@ -16,6 +17,7 @@ const DRIVER_MSSQL: &str = "mssql";
 
 const SNAPSHOT_SUFFIX: &str = ".snapshot.json";
 const LATEST_SNAPSHOT_KEY: &str = "latest";
+const PREVIOUS_SNAPSHOT_KEY: &str = "previous";
 const AUTO_DETECT_DRIVER_ERROR: &str =
     "Could not auto-detect database driver from connection string. Please specify --driver explicitly.";
 
@@ -47,20 +49,17 @@ pub fn resolve_snapshot(
     snapshot_id: &str,
     directory: &str,
 ) -> Result<Snapshot> {
-    match snapshot_id {
-        id if id.ends_with(SNAPSHOT_SUFFIX) => {
-            manager.load(id).map_err(Into::into)
-        }
-        LATEST_SNAPSHOT_KEY => manager
-            .latest()
-            .context("Failed to load latest snapshot")?
-            .ok_or_else(|| {
-                anyhow::anyhow!("No snapshots found in {}", directory)
-            }),
-        id => manager
-            .load(&build_snapshot_filename(id))
-            .map_err(Into::into),
+    let resolved = resolve_snapshot_target(manager, snapshot_id, directory)?;
+
+    if is_path_reference(snapshot_id) {
+        return SnapshotManager::load_from_path(&resolved).map_err(|error| {
+            anyhow::anyhow!("Invalid snapshot file:\n{}\n{}", resolved, error)
+        });
     }
+
+    manager.load(&resolved).map_err(|error| {
+        anyhow::anyhow!("Invalid snapshot file:\n{}\n{}", resolved, error)
+    })
 }
 
 pub fn resolve_snapshot_filename(
@@ -68,17 +67,29 @@ pub fn resolve_snapshot_filename(
     snapshot_id: &str,
     directory: &str,
 ) -> Result<String> {
-    match snapshot_id {
-        id if id.ends_with(SNAPSHOT_SUFFIX) => Ok(id.to_string()),
-        LATEST_SNAPSHOT_KEY => {
-            let snapshots =
-                manager.list().context("Failed to list snapshots")?;
-            snapshots.last().cloned().ok_or_else(|| {
-                anyhow::anyhow!("No snapshots found in {}", directory)
-            })
-        }
-        id => Ok(build_snapshot_filename(id)),
+    let resolved = resolve_snapshot_target(manager, snapshot_id, directory)?;
+
+    if is_path_reference(snapshot_id) {
+        return Path::new(&resolved)
+            .file_name()
+            .map(|filename| filename.to_string_lossy().to_string())
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Failed to resolve snapshot filename from path: {}",
+                    resolved
+                )
+            });
     }
+
+    Ok(resolved)
+}
+
+pub fn resolve_snapshot_path(
+    manager: &SnapshotManager,
+    snapshot_id: &str,
+    directory: &str,
+) -> Result<String> {
+    resolve_snapshot_target(manager, snapshot_id, directory)
 }
 
 pub fn resolve_driver(
@@ -93,16 +104,82 @@ pub fn resolve_driver(
 }
 
 fn build_snapshot_filename(snapshot_id: &str) -> String {
-    match snapshot_id.len() {
-        14 => format!(
+    if snapshot_id.ends_with(SNAPSHOT_SUFFIX) {
+        return snapshot_id.to_string();
+    }
+
+    if is_compact_timestamp(snapshot_id) {
+        return format!(
             "{}_{}_{}_{}.snapshot.json",
             &snapshot_id[0..4],
             &snapshot_id[4..6],
             &snapshot_id[6..8],
             &snapshot_id[8..14]
-        ),
-        _ => format!("{}.snapshot.json", snapshot_id),
+        );
     }
+
+    if is_underscored_timestamp(snapshot_id) {
+        return format!("{}.snapshot.json", snapshot_id);
+    }
+
+    format!("{}.snapshot.json", snapshot_id)
+}
+
+fn resolve_snapshot_target(
+    manager: &SnapshotManager,
+    snapshot_id: &str,
+    directory: &str,
+) -> Result<String> {
+    match snapshot_id {
+        LATEST_SNAPSHOT_KEY => resolve_relative_snapshot(manager, directory, 1),
+        PREVIOUS_SNAPSHOT_KEY => {
+            resolve_relative_snapshot(manager, directory, 2)
+        }
+        id if is_path_reference(id) => Ok(id.to_string()),
+        id => Ok(build_snapshot_filename(id)),
+    }
+}
+
+fn resolve_relative_snapshot(
+    manager: &SnapshotManager,
+    directory: &str,
+    from_end: usize,
+) -> Result<String> {
+    let snapshots = manager.list().context("Failed to list snapshots")?;
+    if snapshots.len() < from_end {
+        let label = if from_end == 1 { "latest" } else { "previous" };
+        return Err(anyhow::anyhow!(
+            "No {} snapshot found in {}",
+            label,
+            directory
+        ));
+    }
+
+    Ok(snapshots[snapshots.len() - from_end].clone())
+}
+
+fn is_path_reference(value: &str) -> bool {
+    let path = Path::new(value);
+    path.is_absolute() || value.contains('/') || value.contains('\\')
+}
+
+fn is_compact_timestamp(value: &str) -> bool {
+    value.len() == 14 && value.chars().all(|c| c.is_ascii_digit())
+}
+
+fn is_underscored_timestamp(value: &str) -> bool {
+    if value.len() != 17 {
+        return false;
+    }
+
+    let bytes = value.as_bytes();
+    bytes[4] == b'_'
+        && bytes[7] == b'_'
+        && bytes[10] == b'_'
+        && value
+            .chars()
+            .enumerate()
+            .all(|(idx, c)| matches!(idx, 4 | 7 | 10) || c.is_ascii_digit())
 }
 
 #[cfg(test)]

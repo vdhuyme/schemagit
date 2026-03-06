@@ -37,7 +37,7 @@ pub async fn execute(
     println!("Found {} tables", schema.tables.len());
 
     // Create snapshot
-    let snapshot = Snapshot::new(driver.to_string(), schema);
+    let snapshot = Snapshot::new(driver.to_string(), db_name.clone(), schema);
 
     // Save snapshot
     let manager = SnapshotManager::new(output_dir);

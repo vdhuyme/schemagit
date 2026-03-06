@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-03-10
+
+### Added
+
+- `snapshots` command to list available snapshot IDs sorted by timestamp
+- `previous` snapshot alias across snapshot-loading commands
+- `--snapshot-dir` option for `diff` and `migrate`
+- `-o/--output` option for `graph` command
+- Snapshot metadata fields: `database_name` and `snapshot_version`
+
+### Improved
+
+- Consistent snapshot resolution for full path, filename, timestamp ID, `latest`, and `previous`
+- Snapshot loading now validates deserialized structure and reports clear invalid-file errors
+- Diff output ordering is deterministic to keep generated migration SQL stable
+- Diff detection now treats changed index and foreign key definitions as remove+add operations
+- Migration generation now verifies table/column/foreign key/index references before output
+
+### Fixed
+
+- Graph DOT output now includes isolated tables (tables without relationships)
+- Replaced production `unwrap()` calls in introspector connection getters with explicit errors
+
 ## [0.2.0] - 2026-03-05
 
 ### Added

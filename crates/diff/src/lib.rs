@@ -1,6 +1,6 @@
 use schemagit_core::{Column, DatabaseSchema, ForeignKey, Index, Table};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 
 const NO_CHANGES_MESSAGE: &str = "No changes detected";
 const TABLES_ADDED_LABEL: &str = "Tables Added";
@@ -149,17 +149,19 @@ pub fn diff_schemas(
         .map(|t| (t.name.clone(), t))
         .collect();
 
-    let old_table_names: HashSet<String> = old_tables.keys().cloned().collect();
-    let new_table_names: HashSet<String> = new_tables.keys().cloned().collect();
+    let old_table_names: BTreeSet<String> =
+        old_tables.keys().cloned().collect();
+    let new_table_names: BTreeSet<String> =
+        new_tables.keys().cloned().collect();
 
     // Find added tables
-    let tables_added: Vec<Table> = new_table_names
+    let mut tables_added: Vec<Table> = new_table_names
         .difference(&old_table_names)
         .filter_map(|name| new_tables.get(name).map(|&t| t.clone()))
         .collect();
 
     // Find removed tables
-    let tables_removed: Vec<Table> = old_table_names
+    let mut tables_removed: Vec<Table> = old_table_names
         .difference(&new_table_names)
         .filter_map(|name| old_tables.get(name).map(|&t| t.clone()))
         .collect();
@@ -170,12 +172,17 @@ pub fn diff_schemas(
         if let (Some(&old_table), Some(&new_table)) =
             (old_tables.get(table_name), new_tables.get(table_name))
         {
-            let table_diff = diff_tables(old_table, new_table);
+            let mut table_diff = diff_tables(old_table, new_table);
+            sort_table_diff(&mut table_diff);
             if table_diff.has_changes() {
                 tables_modified.push(table_diff);
             }
         }
     }
+
+    tables_added.sort_by(|a, b| a.name.cmp(&b.name));
+    tables_removed.sort_by(|a, b| a.name.cmp(&b.name));
+    tables_modified.sort_by(|a, b| a.table_name.cmp(&b.table_name));
 
     SchemaDiff {
         tables_added,
@@ -236,17 +243,17 @@ fn diff_columns(
     let new_cols: HashMap<String, &Column> =
         new_columns.iter().map(|c| (c.name.clone(), c)).collect();
 
-    let old_names: HashSet<String> = old_cols.keys().cloned().collect();
-    let new_names: HashSet<String> = new_cols.keys().cloned().collect();
+    let old_names: BTreeSet<String> = old_cols.keys().cloned().collect();
+    let new_names: BTreeSet<String> = new_cols.keys().cloned().collect();
 
     // Added columns
-    let columns_added: Vec<Column> = new_names
+    let mut columns_added: Vec<Column> = new_names
         .difference(&old_names)
         .filter_map(|name| new_cols.get(name).map(|&c| c.clone()))
         .collect();
 
     // Removed columns
-    let columns_removed: Vec<Column> = old_names
+    let mut columns_removed: Vec<Column> = old_names
         .difference(&new_names)
         .filter_map(|name| old_cols.get(name).map(|&c| c.clone()))
         .collect();
@@ -267,6 +274,10 @@ fn diff_columns(
         }
     }
 
+    columns_added.sort_by(|a, b| a.name.cmp(&b.name));
+    columns_removed.sort_by(|a, b| a.name.cmp(&b.name));
+    columns_modified.sort_by(|a, b| a.column_name.cmp(&b.column_name));
+
     (columns_added, columns_removed, columns_modified)
 }
 
@@ -281,18 +292,31 @@ fn diff_indexes(
     let new_idxs: HashMap<String, &Index> =
         new_indexes.iter().map(|i| (i.name.clone(), i)).collect();
 
-    let old_names: HashSet<String> = old_idxs.keys().cloned().collect();
-    let new_names: HashSet<String> = new_idxs.keys().cloned().collect();
+    let old_names: BTreeSet<String> = old_idxs.keys().cloned().collect();
+    let new_names: BTreeSet<String> = new_idxs.keys().cloned().collect();
 
-    let indexes_added: Vec<Index> = new_names
+    let mut indexes_added: Vec<Index> = new_names
         .difference(&old_names)
         .filter_map(|name| new_idxs.get(name).map(|&i| i.clone()))
         .collect();
 
-    let indexes_removed: Vec<Index> = old_names
+    let mut indexes_removed: Vec<Index> = old_names
         .difference(&new_names)
         .filter_map(|name| old_idxs.get(name).map(|&i| i.clone()))
         .collect();
+
+    for name in old_names.intersection(&new_names) {
+        if let (Some(old), Some(new)) = (old_idxs.get(name), new_idxs.get(name))
+        {
+            if old != new {
+                indexes_removed.push((*old).clone());
+                indexes_added.push((*new).clone());
+            }
+        }
+    }
+
+    indexes_added.sort_by(|a, b| a.name.cmp(&b.name));
+    indexes_removed.sort_by(|a, b| a.name.cmp(&b.name));
 
     (indexes_added, indexes_removed)
 }
@@ -308,20 +332,54 @@ fn diff_foreign_keys(
     let new_fks_map: HashMap<String, &ForeignKey> =
         new_fks.iter().map(|fk| (fk.name.clone(), fk)).collect();
 
-    let old_names: HashSet<String> = old_fks_map.keys().cloned().collect();
-    let new_names: HashSet<String> = new_fks_map.keys().cloned().collect();
+    let old_names: BTreeSet<String> = old_fks_map.keys().cloned().collect();
+    let new_names: BTreeSet<String> = new_fks_map.keys().cloned().collect();
 
-    let foreign_keys_added: Vec<ForeignKey> = new_names
+    let mut foreign_keys_added: Vec<ForeignKey> = new_names
         .difference(&old_names)
         .filter_map(|name| new_fks_map.get(name).map(|&fk| fk.clone()))
         .collect();
 
-    let foreign_keys_removed: Vec<ForeignKey> = old_names
+    let mut foreign_keys_removed: Vec<ForeignKey> = old_names
         .difference(&new_names)
         .filter_map(|name| old_fks_map.get(name).map(|&fk| fk.clone()))
         .collect();
 
+    for name in old_names.intersection(&new_names) {
+        if let (Some(old), Some(new)) =
+            (old_fks_map.get(name), new_fks_map.get(name))
+        {
+            if old != new {
+                foreign_keys_removed.push((*old).clone());
+                foreign_keys_added.push((*new).clone());
+            }
+        }
+    }
+
+    foreign_keys_added.sort_by(|a, b| a.name.cmp(&b.name));
+    foreign_keys_removed.sort_by(|a, b| a.name.cmp(&b.name));
+
     (foreign_keys_added, foreign_keys_removed)
+}
+
+fn sort_table_diff(table_diff: &mut TableDiff) {
+    table_diff.columns_added.sort_by(|a, b| a.name.cmp(&b.name));
+    table_diff
+        .columns_removed
+        .sort_by(|a, b| a.name.cmp(&b.name));
+    table_diff
+        .columns_modified
+        .sort_by(|a, b| a.column_name.cmp(&b.column_name));
+    table_diff.indexes_added.sort_by(|a, b| a.name.cmp(&b.name));
+    table_diff
+        .indexes_removed
+        .sort_by(|a, b| a.name.cmp(&b.name));
+    table_diff
+        .foreign_keys_added
+        .sort_by(|a, b| a.name.cmp(&b.name));
+    table_diff
+        .foreign_keys_removed
+        .sort_by(|a, b| a.name.cmp(&b.name));
 }
 
 #[cfg(test)]

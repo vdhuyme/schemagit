@@ -46,7 +46,11 @@ impl MssqlIntrospector {
             self.client = Some(client);
         }
 
-        Ok(self.client.as_mut().unwrap())
+        self.client.as_mut().ok_or_else(|| {
+            IntrospectorError::ConnectionError(
+                "MSSQL client is not initialized".to_string(),
+            )
+        })
     }
 
     async fn introspect_tables(&mut self) -> IntrospectorResult<Vec<String>> {

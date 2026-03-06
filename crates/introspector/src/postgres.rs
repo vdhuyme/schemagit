@@ -32,7 +32,11 @@ impl PostgresIntrospector {
                 })?;
             self.pool = Some(pool);
         }
-        Ok(self.pool.as_ref().unwrap())
+        self.pool.as_ref().ok_or_else(|| {
+            IntrospectorError::ConnectionError(
+                "PostgreSQL pool is not initialized".to_string(),
+            )
+        })
     }
 
     /// Introspect tables from the database.

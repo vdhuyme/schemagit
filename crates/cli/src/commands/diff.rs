@@ -3,24 +3,42 @@ use colored::Colorize;
 use schemagit_diff::diff_schemas;
 use schemagit_snapshot::SnapshotManager;
 
+use super::utils;
+
 /// Execute the diff command.
-pub fn execute(old_path: &str, new_path: &str, format: &str) -> Result<()> {
+pub fn execute(
+    old_path: &str,
+    new_path: &str,
+    snapshot_dir: &str,
+    format: &str,
+) -> Result<()> {
     println!("{}", "Comparing snapshots...".cyan());
 
-    // Load snapshots
-    let old_snapshot = SnapshotManager::load_from_path(old_path)
-        .context(format!("Failed to load old snapshot: {}", old_path))?;
+    let manager = SnapshotManager::new(snapshot_dir);
 
-    let new_snapshot = SnapshotManager::load_from_path(new_path)
-        .context(format!("Failed to load new snapshot: {}", new_path))?;
+    let resolved_old =
+        utils::resolve_snapshot_path(&manager, old_path, snapshot_dir)?;
+    let resolved_new =
+        utils::resolve_snapshot_path(&manager, new_path, snapshot_dir)?;
+
+    // Load snapshots
+    let old_snapshot =
+        utils::resolve_snapshot(&manager, old_path, snapshot_dir).context(
+            format!("Failed to load old snapshot: {}", resolved_old),
+        )?;
+
+    let new_snapshot =
+        utils::resolve_snapshot(&manager, new_path, snapshot_dir).context(
+            format!("Failed to load new snapshot: {}", resolved_new),
+        )?;
 
     println!(
         "Old snapshot: {} ({})",
-        old_path, old_snapshot.database_type
+        resolved_old, old_snapshot.database_type
     );
     println!(
         "New snapshot: {} ({})",
-        new_path, new_snapshot.database_type
+        resolved_new, new_snapshot.database_type
     );
 
     // Compare schemas
