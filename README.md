@@ -402,5 +402,3 @@ Please include tests and documentation updates in your pull request.
 ## License
 
 MIT. See `LICENSE` for details.
-
----
