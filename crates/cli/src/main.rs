@@ -41,6 +41,10 @@ enum Commands {
         /// Path to the new snapshot file
         new: String,
 
+        /// Directory containing snapshots (default: ./snapshots)
+        #[arg(short = 's', long, default_value = DEFAULT_SNAPSHOTS_DIR)]
+        snapshot_dir: String,
+
         /// Output format (text, json)
         #[arg(short, long, default_value = DEFAULT_DIFF_FORMAT)]
         format: String,
@@ -54,9 +58,21 @@ enum Commands {
         /// Path to the new snapshot file
         new: String,
 
+        /// Directory containing snapshots (default: ./snapshots)
+        #[arg(short = 's', long, default_value = DEFAULT_SNAPSHOTS_DIR)]
+        snapshot_dir: String,
+
         /// Output file for the migration (default: stdout)
         #[arg(short, long)]
         output: Option<String>,
+
+        /// Automatically create missing output directory
+        #[arg(long, conflicts_with = "no_create_dir")]
+        yes: bool,
+
+        /// Do not create missing output directory
+        #[arg(long = "no-create-dir", conflicts_with = "yes")]
+        no_create_dir: bool,
     },
 
     /// Check database drift against the latest snapshot
@@ -76,6 +92,13 @@ enum Commands {
 
     /// List all snapshots
     List {
+        /// Directory containing snapshots (default: ./snapshots)
+        #[arg(short, long, default_value = DEFAULT_SNAPSHOTS_DIR)]
+        directory: String,
+    },
+
+    /// List snapshot IDs in timestamp order
+    Snapshots {
         /// Directory containing snapshots (default: ./snapshots)
         #[arg(short, long, default_value = DEFAULT_SNAPSHOTS_DIR)]
         directory: String,
@@ -120,6 +143,18 @@ enum Commands {
         /// Output format (text, mermaid, dot)
         #[arg(short, long, default_value = DEFAULT_GRAPH_FORMAT)]
         format: String,
+
+        /// Output file (default: stdout)
+        #[arg(short, long)]
+        output: Option<String>,
+
+        /// Automatically create missing output directory
+        #[arg(long, conflicts_with = "no_create_dir")]
+        yes: bool,
+
+        /// Do not create missing output directory
+        #[arg(long = "no-create-dir", conflicts_with = "yes")]
+        no_create_dir: bool,
     },
 
     /// Export snapshot to various formats
@@ -171,13 +206,28 @@ async fn main() -> Result<()> {
             output,
         } => commands::snapshot::execute(driver, &connection, &output).await,
 
-        Commands::Diff { old, new, format } => {
-            commands::diff::execute(&old, &new, &format)
-        }
+        Commands::Diff {
+            old,
+            new,
+            snapshot_dir,
+            format,
+        } => commands::diff::execute(&old, &new, &snapshot_dir, &format),
 
-        Commands::Migrate { old, new, output } => {
-            commands::migrate::execute(&old, &new, output.as_deref())
-        }
+        Commands::Migrate {
+            old,
+            new,
+            snapshot_dir,
+            output,
+            yes,
+            no_create_dir,
+        } => commands::migrate::execute(
+            &old,
+            &new,
+            &snapshot_dir,
+            output.as_deref(),
+            yes,
+            no_create_dir,
+        ),
 
         Commands::Status {
             driver,
@@ -186,6 +236,10 @@ async fn main() -> Result<()> {
         } => commands::status::execute(driver, &connection, &snapshots).await,
 
         Commands::List { directory } => commands::list::execute(&directory),
+
+        Commands::Snapshots { directory } => {
+            commands::snapshots::execute(&directory)
+        }
 
         Commands::History { directory } => {
             commands::history::execute(&directory)
@@ -205,7 +259,17 @@ async fn main() -> Result<()> {
             snapshot,
             directory,
             format,
-        } => commands::graph::execute(&snapshot, &directory, &format),
+            output,
+            yes,
+            no_create_dir,
+        } => commands::graph::execute(
+            &snapshot,
+            &directory,
+            &format,
+            output.as_deref(),
+            yes,
+            no_create_dir,
+        ),
 
         Commands::Export {
             snapshot,

@@ -128,6 +128,9 @@ schemagit snapshot -c <connection-string> [-d <driver>] [-o <output-dir>]
 # List all snapshots
 schemagit list [-d <directory>]
 
+# List snapshot IDs only
+schemagit snapshots [-d <directory>]
+
 # Show snapshot history
 schemagit history [-d <directory>]
 
@@ -142,7 +145,7 @@ schemagit tag <snapshot-id> <tag-name> [-d <directory>]
 
 ```bash
 # Compare two snapshots
-schemagit diff <old> <new> [--format text|json]
+schemagit diff <old> <new> [--snapshot-dir <dir>] [--format text|json]
 
 # Check database drift
 schemagit status -c <connection-string> [-d <driver>] [-s <snapshots-dir>]
@@ -154,14 +157,14 @@ schemagit summary <snapshot-id> [-d <directory>]
 schemagit validate <snapshot-id> [-d <directory>]
 
 # Visualize table relationships
-schemagit graph <snapshot-id> --format <text|mermaid|dot> [-d <directory>]
+schemagit graph <snapshot-id> --format <text|mermaid|dot> [-d <directory>] [-o <output-file>] [--yes|--no-create-dir]
 ```
 
 ### Migration
 
 ```bash
 # Generate migration SQL
-schemagit migrate <old> <new> [-o <output-file>]
+schemagit migrate <old> <new> [--snapshot-dir <dir>] [-o <output-file>] [--yes|--no-create-dir]
 ```
 
 ### Export
@@ -206,7 +209,10 @@ schemagit validate post-deploy-2026-03-05
 schemagit export latest --format sql > docs/schema.sql
 
 # Create ER diagram (Mermaid)
-schemagit graph latest --format mermaid > docs/schema.mmd
+schemagit graph latest --format mermaid -o docs/schema.mmd
+
+# Non-interactive/CI-safe directory creation
+schemagit graph latest --format mermaid -o docs/schema.mmd --yes
 
 # Generate statistics
 schemagit summary latest > docs/schema-stats.txt
@@ -287,17 +293,45 @@ digraph schema {
 }
 ```
 
+### Output Directory Behavior
+
+When `-o/--output` is provided and the parent directory does not exist:
+
+- Default (interactive terminal): prompt to create the directory
+- Default (non-interactive, CI, or redirected input): return an error
+- `--yes`: create directory automatically without prompting
+- `--no-create-dir`: never create directory, always return an error
+
+Examples:
+
+```bash
+schemagit graph latest --format mermaid -o docs/schema.mmd --yes
+schemagit migrate latest previous -o migrations/001_init.sql --no-create-dir
+```
+
 ---
 
 ## Snapshot ID Formats
 
 Snapshots can be referenced in multiple ways:
 
-| Format            | Example                           | Description          |
-| ----------------- | --------------------------------- | -------------------- |
-| **latest**        | `latest`                          | Most recent snapshot |
-| **Full filename** | `2026_03_05_072538.snapshot.json` | Complete filename    |
-| **Short ID**      | `20260305072538`                  | Timestamp-based ID   |
+| Format            | Example                                       | Description                 |
+| ----------------- | --------------------------------------------- | --------------------------- |
+| **latest**        | `latest`                                      | Most recent snapshot        |
+| **previous**      | `previous`                                    | Snapshot before latest      |
+| **Full filename** | `2026_03_05_072538.snapshot.json`             | Complete filename           |
+| **Timestamp ID**  | `2026_03_05_072538`                           | Snapshot timestamp ID       |
+| **Short ID**      | `20260305072538`                              | Timestamp-based ID          |
+| **Full path**     | `./snapshots/2026_03_05_072538.snapshot.json` | Absolute/relative file path |
+
+All snapshot-accepting commands resolve these formats consistently.
+
+You can also override the snapshot directory for `diff` and `migrate`:
+
+```bash
+schemagit diff latest previous --snapshot-dir ./db/snapshots
+schemagit migrate latest previous --snapshot-dir ./db/snapshots -o ./migrations/001_init.sql
+```
 
 ---
 
@@ -308,7 +342,7 @@ Snapshots can be referenced in multiple ways:
 | PostgreSQL           | Fully supported | `postgres`  |
 | MySQL                | Planned         | `mysql`     |
 | SQLite               | Planned         | `sqlite`    |
-| Microsoft SQL Server | Planned         | `mssql`     |
+| Microsoft SQL Server | Fully supported | `mssql`     |
 
 ---
 

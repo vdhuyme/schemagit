@@ -2,11 +2,19 @@ use anyhow::Result;
 use colored::Colorize;
 use schemagit_snapshot::SnapshotManager;
 use std::collections::{HashMap, HashSet};
+use std::fs;
 
 use super::utils;
 
 /// Execute the graph command.
-pub fn execute(snapshot_id: &str, directory: &str, format: &str) -> Result<()> {
+pub fn execute(
+    snapshot_id: &str,
+    directory: &str,
+    format: &str,
+    output_file: Option<&str>,
+    yes: bool,
+    no_create_dir: bool,
+) -> Result<()> {
     let manager = SnapshotManager::new(directory);
     let snapshot = utils::resolve_snapshot(&manager, snapshot_id, directory)?;
 
@@ -27,19 +35,28 @@ pub fn execute(snapshot_id: &str, directory: &str, format: &str) -> Result<()> {
         }
     }
 
-    match format.to_lowercase().as_str() {
+    verify_graph_relationships(&all_tables, &snapshot.schema.tables)?;
+
+    let graph = match format.to_lowercase().as_str() {
         "text" => render_text(&all_tables, &relationships),
         "mermaid" => render_mermaid(&all_tables, &relationships),
-        "dot" => render_dot(&relationships),
+        "dot" => render_dot(&all_tables, &relationships),
         _ => {
-            println!(
-                "{}",
-                format!(
-                    "Unknown format: {}. Use text, mermaid, or dot",
-                    format
-                )
-                .red()
-            );
+            return Err(anyhow::anyhow!(
+                "Unknown format: {}. Use text, mermaid, or dot",
+                format
+            ));
+        }
+    };
+
+    match output_file {
+        Some(path) => {
+            utils::prepare_output_path(path, yes, no_create_dir)?;
+            fs::write(path, graph)?;
+            println!("{}", format!("✓ Graph saved: {}", path).green());
+        }
+        None => {
+            print!("{}", graph);
         }
     }
 
@@ -50,9 +67,12 @@ pub fn execute(snapshot_id: &str, directory: &str, format: &str) -> Result<()> {
 fn render_text(
     all_tables: &HashSet<String>,
     relationships: &HashSet<(String, String, String, String)>,
-) {
-    println!("{}", "=== Schema Relationship Graph ===".bold().cyan());
-    println!();
+) -> String {
+    let mut output = String::new();
+    output.push_str(&format!(
+        "{}\n\n",
+        "=== Schema Relationship Graph ===".bold().cyan()
+    ));
 
     let mut adjacency: HashMap<String, Vec<String>> = HashMap::new();
 
@@ -78,27 +98,34 @@ fn render_text(
     let mut visited = HashSet::new();
 
     for root in &root_tables {
-        print_tree(root, &adjacency, &mut visited, 0);
+        push_tree(root, &adjacency, &mut visited, 0, &mut output);
     }
 
-    let remaining: Vec<String> =
+    let mut remaining: Vec<String> =
         all_tables.difference(&visited).cloned().collect();
+    remaining.sort();
 
     if !remaining.is_empty() {
-        println!();
-        println!("{}", "Circular dependencies or isolated tables:".yellow());
+        output.push('\n');
+        output.push_str(&format!(
+            "{}\n",
+            "Circular dependencies or isolated tables:".yellow()
+        ));
         for table in remaining {
-            println!("  {}", table.cyan());
+            output.push_str(&format!("  {}\n", table.cyan()));
         }
     }
+
+    output
 }
 
 /// Recursive tree printer.
-fn print_tree(
+fn push_tree(
     table: &str,
     adjacency: &HashMap<String, Vec<String>>,
     visited: &mut HashSet<String>,
     depth: usize,
+    output: &mut String,
 ) {
     if visited.contains(table) {
         return;
@@ -109,11 +136,14 @@ fn print_tree(
     let indent = "  ".repeat(depth);
     let prefix = if depth > 0 { "└── " } else { "" };
 
-    println!("{}{}{}", indent, prefix, table.green());
+    output.push_str(&format!("{}{}{}\n", indent, prefix, table.green()));
 
     if let Some(children) = adjacency.get(table) {
-        for child in children {
-            print_tree(child, adjacency, visited, depth + 1);
+        let mut sorted_children = children.clone();
+        sorted_children.sort();
+
+        for child in sorted_children {
+            push_tree(&child, adjacency, visited, depth + 1, output);
         }
     }
 }
@@ -122,34 +152,82 @@ fn print_tree(
 fn render_mermaid(
     all_tables: &HashSet<String>,
     relationships: &HashSet<(String, String, String, String)>,
-) {
-    println!("erDiagram");
+) -> String {
+    let mut output = String::from("erDiagram\n");
 
-    for table in all_tables {
-        println!("    {}", table);
+    let mut tables: Vec<String> = all_tables.iter().cloned().collect();
+    tables.sort();
+    for table in tables {
+        output.push_str(&format!("    {}\n", table));
     }
 
-    for (from, to, column, ref_column) in relationships {
-        println!(
+    let mut sorted_relationships: Vec<_> =
+        relationships.iter().cloned().collect();
+    sorted_relationships.sort();
+    for (from, to, column, ref_column) in sorted_relationships {
+        output.push_str(&format!(
             "    {} ||--o{{ {} : \"{} to {}\"",
             to, from, ref_column, column
-        );
+        ));
+        output.push('\n');
     }
+
+    output
 }
 
 /// Render Graphviz DOT format.
-fn render_dot(relationships: &HashSet<(String, String, String, String)>) {
-    println!("digraph schema {{");
-    println!("    rankdir=LR;");
-    println!("    node [shape=box];");
-    println!();
+fn render_dot(
+    all_tables: &HashSet<String>,
+    relationships: &HashSet<(String, String, String, String)>,
+) -> String {
+    let mut output = String::from("digraph schema {\n");
+    output.push_str("    rankdir=LR;\n");
+    output.push_str("    node [shape=box];\n\n");
 
-    for (from, to, column, ref_column) in relationships {
-        println!(
+    let mut tables: Vec<String> = all_tables.iter().cloned().collect();
+    tables.sort();
+    for table in tables {
+        output.push_str(&format!("    \"{}\";\n", table));
+    }
+    output.push('\n');
+
+    let mut sorted_relationships: Vec<_> =
+        relationships.iter().cloned().collect();
+    sorted_relationships.sort();
+    for (from, to, column, ref_column) in sorted_relationships {
+        output.push_str(&format!(
             "    \"{}\" -> \"{}\" [label=\"{} to {}\"];",
             from, to, column, ref_column
-        );
+        ));
+        output.push('\n');
     }
 
-    println!("}}");
+    output.push_str("}\n");
+    output
+}
+
+fn verify_graph_relationships(
+    all_tables: &HashSet<String>,
+    tables: &[schemagit_core::Table],
+) -> Result<()> {
+    for table in tables {
+        for fk in &table.foreign_keys {
+            if !all_tables.contains(&fk.ref_table) {
+                return Err(anyhow::anyhow!(
+                    "Graph generation error:\nReferenced table \"{}\" not found.",
+                    fk.ref_table
+                ));
+            }
+
+            if !table.columns.iter().any(|column| column.name == fk.column) {
+                return Err(anyhow::anyhow!(
+                    "Graph generation error:\nReferenced column \"{}.{}\" not found.",
+                    table.name,
+                    fk.column
+                ));
+            }
+        }
+    }
+
+    Ok(())
 }

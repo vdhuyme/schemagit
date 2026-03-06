@@ -6,6 +6,7 @@ pub mod list;
 pub mod migrate;
 pub mod show;
 pub mod snapshot;
+pub mod snapshots;
 pub mod status;
 pub mod summary;
 pub mod tag;

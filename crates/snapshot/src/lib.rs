@@ -7,6 +7,8 @@ use thiserror::Error;
 
 const SNAPSHOT_EXTENSION: &str = ".snapshot.json";
 const TIMESTAMP_FORMAT: &str = "%Y_%m_%d_%H%M%S";
+const DEFAULT_DATABASE_NAME: &str = "unknown";
+const DEFAULT_SNAPSHOT_VERSION: &str = "1";
 
 /// Errors that can occur during snapshot operations.
 #[derive(Debug, Error)]
@@ -31,6 +33,12 @@ pub type SnapshotResult<T> = Result<T, SnapshotError>;
 pub struct Snapshot {
     /// Database type (e.g., "postgres", "mysql")
     pub database_type: String,
+    /// Database name from the connection context
+    #[serde(default = "default_database_name")]
+    pub database_name: String,
+    /// Snapshot format version for forward-compatible evolution
+    #[serde(default = "default_snapshot_version")]
+    pub snapshot_version: String,
     /// Timestamp when the snapshot was created
     pub timestamp: DateTime<Utc>,
     /// The actual database schema
@@ -39,13 +47,101 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Create a new snapshot.
-    pub fn new(database_type: String, schema: DatabaseSchema) -> Self {
+    pub fn new(
+        database_type: String,
+        database_name: String,
+        schema: DatabaseSchema,
+    ) -> Self {
         Self {
             database_type,
+            database_name,
+            snapshot_version: DEFAULT_SNAPSHOT_VERSION.to_string(),
             timestamp: Utc::now(),
             schema,
         }
     }
+
+    fn validate(&self) -> SnapshotResult<()> {
+        if self.database_type.trim().is_empty() {
+            return Err(SnapshotError::InvalidFormat(
+                "missing or empty \"database_type\" field".to_string(),
+            ));
+        }
+
+        if self.database_name.trim().is_empty() {
+            return Err(SnapshotError::InvalidFormat(
+                "missing or empty \"database_name\" field".to_string(),
+            ));
+        }
+
+        if self.snapshot_version.trim().is_empty() {
+            return Err(SnapshotError::InvalidFormat(
+                "missing or empty \"snapshot_version\" field".to_string(),
+            ));
+        }
+
+        for table in &self.schema.tables {
+            if table.name.trim().is_empty() {
+                return Err(SnapshotError::InvalidFormat(
+                    "table has missing or empty \"name\" field".to_string(),
+                ));
+            }
+
+            for column in &table.columns {
+                if column.name.trim().is_empty() {
+                    return Err(SnapshotError::InvalidFormat(format!(
+                        "table \"{}\" has a column with missing or empty \"name\" field",
+                        table.name
+                    )));
+                }
+
+                if column.data_type.trim().is_empty() {
+                    return Err(SnapshotError::InvalidFormat(format!(
+                        "table \"{}\" column \"{}\" has missing or empty \"data_type\" field",
+                        table.name, column.name
+                    )));
+                }
+            }
+
+            for index in &table.indexes {
+                if index.name.trim().is_empty() {
+                    return Err(SnapshotError::InvalidFormat(format!(
+                        "table \"{}\" has an index with missing or empty \"name\" field",
+                        table.name
+                    )));
+                }
+            }
+
+            for foreign_key in &table.foreign_keys {
+                if foreign_key.name.trim().is_empty() {
+                    return Err(SnapshotError::InvalidFormat(format!(
+                        "table \"{}\" has a foreign key with missing or empty \"name\" field",
+                        table.name
+                    )));
+                }
+
+                if foreign_key.column.trim().is_empty()
+                    || foreign_key.ref_table.trim().is_empty()
+                    || foreign_key.ref_column.trim().is_empty()
+                {
+                    return Err(SnapshotError::InvalidFormat(format!(
+                        "table \"{}\" foreign key \"{}\" has missing required reference fields",
+                        table.name, foreign_key.name
+                    )));
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
+fn default_database_name() -> String {
+    DEFAULT_DATABASE_NAME.to_string()
+}
+
+fn default_snapshot_version() -> String {
+    DEFAULT_SNAPSHOT_VERSION.to_string()
 }
 
 /// Manages schema snapshots on the filesystem.
@@ -182,7 +278,9 @@ impl SnapshotManager {
         }
 
         let json = fs::read_to_string(path)?;
-        let snapshot: Snapshot = serde_json::from_str(&json)?;
+        let snapshot: Snapshot = serde_json::from_str(&json)
+            .map_err(|error| SnapshotError::InvalidFormat(error.to_string()))?;
+        snapshot.validate()?;
 
         Ok(snapshot)
     }
@@ -209,8 +307,14 @@ mod tests {
             }],
         };
 
-        let snapshot = Snapshot::new("postgres".to_string(), schema);
+        let snapshot = Snapshot::new(
+            "postgres".to_string(),
+            "test_db".to_string(),
+            schema,
+        );
         assert_eq!(snapshot.database_type, "postgres");
+        assert_eq!(snapshot.database_name, "test_db");
+        assert_eq!(snapshot.snapshot_version, "1");
         assert_eq!(snapshot.schema.tables.len(), 1);
     }
 }
