@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-03-06
+
+### Added
+- **Interactive Schema Viewer**: Added `graph serve` command powered by Axum to provide an interactive, web-based view of your schema relationships.
+- **Static Documentation Generator**: New `docs generate` command to create standalone HTML documentation files for snapshots.
+- **Enhanced Visualization**: Added HTML/Json renderers for schema graphs and improved Mermaid/DOT output.
+- **Schema Evolution Timeline**: New top-level `timeline` command to visualize how a database structure has evolved across multiple snapshots.
+- **Generalized Graph Model**: Refactored `schemagit-core` with a unified `SchemaGraph` model that serves as a shared foundation for all visualization and documentation tools.
+
+### Changed
+- Refactored CLI: Split command arguments into a separate `args.rs` module to improve maintainability and strictly follow Rust project size guidelines.
+- Simplified Graph CLI: Replaced top-level `graph` with subcommands `render` and `serve`.
+
+### Fixed
+- Resolved compilation errors related to type inference in snapshot processing.
+- Fixed `cargo test` suite to ensure all 26+ integration and unit tests pass across the workspace.
+
 ## [0.2.3] - 2026-03-06
 
 ### Added
@@ -127,7 +144,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Colored terminal output for better readability
 - Comprehensive error handling with anyhow
 
-[Unreleased]: https://github.com/vdhuyme/schemagit/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/vdhuyme/schemagit/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/vdhuyme/schemagit/compare/v0.2.3...v0.3.0
 [0.2.3]: https://github.com/vdhuyme/schemagit/compare/v0.2.2...v0.2.3
 [0.2.1]: https://github.com/vdhuyme/schemagit/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/vdhuyme/schemagit/compare/v0.1.0...v0.2.0

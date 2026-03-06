@@ -1,4 +1,5 @@
 pub mod diff;
+pub mod docs;
 pub mod export;
 pub mod graph;
 pub mod history;
@@ -11,5 +12,6 @@ pub mod snapshots;
 pub mod status;
 pub mod summary;
 pub mod tag;
+pub mod timeline;
 pub mod utils;
 pub mod validate;

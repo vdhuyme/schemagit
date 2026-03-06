@@ -12,7 +12,9 @@ Schemagit allows you to snapshot database schemas, track structural changes, gen
 - Compare snapshots with deterministic diff output
 - Generate SQL migrations from schema changes
 - Validate schema integrity and modeling issues
-- Visualize table relationships
+- **New (v0.3.0)**: Interactive schema graph viewer (web-based)
+- **New (v0.3.0)**: Automatic static HTML documentation generator
+- **New (v0.3.0)**: Comprehensive schema evolution timeline
 - Flexible snapshot reference resolution
 - CI-friendly output behavior with automation flags
 
@@ -201,16 +203,29 @@ schemagit status -c <connection-string> [-d <driver>] [-s <snapshots-dir>]
 
 ---
 
-### Visualization And Export
+### Visualization, Documentation & Evolution
 
 Render schema graph
-
 ```
-schemagit graph <snapshot> [--format text|mermaid|dot]
+schemagit graph render <snapshot> [--format text|mermaid|dot|html|json]
+```
+
+Launch interactive schema viewer
+```
+schemagit graph serve [snapshot] [--port 7420]
+```
+
+Generate static documentation
+```
+schemagit docs generate [snapshot] [-o docs/schema.html]
+```
+
+Visualize schema evolution timeline
+```
+schemagit timeline [-d <directory>] [--format text|json|html]
 ```
 
 Export snapshot schema
-
 ```
 schemagit export <snapshot> --format <sql|json|yaml>
 ```
@@ -366,19 +381,18 @@ Pull requests should include tests and documentation updates where applicable.
 
 ## Roadmap
 
-Near term
+### Near term
 
 - MySQL introspection and migration support
 - SQLite introspection and migration support
 - snapshot compression
-- performance improvements for large schemas
 
-Long term
+### Long term
 
-- interactive diff viewer
-- web visualization UI
+- multi-snapshot comparison for trend analysis
 - plugin system for custom drivers
 - advanced migration planning
+- cloud-based schema collaboration
 
 ---
 
