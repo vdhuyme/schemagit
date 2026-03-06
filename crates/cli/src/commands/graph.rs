@@ -1,38 +1,14 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use colored::Colorize;
 use schemagit_snapshot::SnapshotManager;
 use std::collections::{HashMap, HashSet};
 
+use super::utils;
+
 /// Execute the graph command.
 pub fn execute(snapshot_id: &str, directory: &str, format: &str) -> Result<()> {
     let manager = SnapshotManager::new(directory);
-
-    // Load snapshot
-    let snapshot = match snapshot_id {
-        id if id.ends_with(".snapshot.json") => manager.load(id)?,
-
-        "latest" => manager
-            .latest()
-            .context("Failed to load latest snapshot")?
-            .ok_or_else(|| {
-                anyhow::anyhow!("No snapshots found in {}", directory)
-            })?,
-
-        id => {
-            let filename = match id.len() {
-                14 => format!(
-                    "{}_{}_{}_{}.snapshot.json",
-                    &id[0..4],
-                    &id[4..6],
-                    &id[6..8],
-                    &id[8..14]
-                ),
-                _ => format!("{}.snapshot.json", id),
-            };
-
-            manager.load(&filename)?
-        }
-    };
+    let snapshot = utils::resolve_snapshot(&manager, snapshot_id, directory)?;
 
     let mut relationships: HashSet<(String, String, String, String)> =
         HashSet::new();

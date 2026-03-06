@@ -2,6 +2,11 @@ use crate::MigrationGenerator;
 use schemagit_core::{Column, ForeignKey, Index, Table};
 use schemagit_diff::{ColumnModification, SchemaDiff, TableDiff};
 
+const UNIQUE_PREFIX: &str = "UNIQUE ";
+const EMPTY: &str = "";
+const NULL_LITERAL: &str = "NULL";
+const NOT_NULL_LITERAL: &str = "NOT NULL";
+
 /// SQL Server (MSSQL) migration generator.
 pub struct MssqlMigrationGenerator;
 
@@ -101,9 +106,7 @@ impl MssqlMigrationGenerator {
             column.data_type.clone(),
         ];
 
-        parts.push(
-            if column.nullable { "NULL" } else { "NOT NULL" }.to_string(),
-        );
+        parts.push(Self::nullability_literal(column.nullable).to_string());
 
         // SQL Server defaults are modeled as constraints; we emit an ADD DEFAULT later in modify/add flows
         // to keep output deterministic and reversible.
@@ -152,10 +155,12 @@ impl MssqlMigrationGenerator {
         let column = Self::quote_identifier(&col_mod.column_name);
 
         if old.data_type != new.data_type || old.nullable != new.nullable {
-            let nullability = if new.nullable { "NULL" } else { "NOT NULL" };
             statements.push(format!(
                 "ALTER TABLE {} ALTER COLUMN {} {} {};",
-                table, column, new.data_type, nullability
+                table,
+                column,
+                new.data_type,
+                Self::nullability_literal(new.nullable)
             ));
         }
 
@@ -181,7 +186,7 @@ impl MssqlMigrationGenerator {
     }
 
     fn generate_create_index(&self, table_name: &str, index: &Index) -> String {
-        let unique = if index.unique { "UNIQUE " } else { "" };
+        let unique = if index.unique { UNIQUE_PREFIX } else { EMPTY };
         let columns = index
             .columns
             .iter()
@@ -273,6 +278,14 @@ impl MssqlMigrationGenerator {
     fn quote_identifier(name: &str) -> String {
         let escaped = name.replace(']', "]]");
         format!("[{}]", escaped)
+    }
+
+    fn nullability_literal(nullable: bool) -> &'static str {
+        if nullable {
+            return NULL_LITERAL;
+        }
+
+        NOT_NULL_LITERAL
     }
 }
 

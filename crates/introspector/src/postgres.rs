@@ -3,6 +3,8 @@ use schemagit_core::{Column, DatabaseSchema, ForeignKey, Index, Table};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Pool, Postgres, Row};
 
+const NULLABLE_YES: &str = "YES";
+
 /// PostgreSQL schema introspector implementation.
 pub struct PostgresIntrospector {
     connection_string: String,
@@ -78,18 +80,7 @@ impl PostgresIntrospector {
         .await
         .map_err(|e| IntrospectorError::QueryError(e.to_string()))?;
 
-        Ok(rows
-            .iter()
-            .map(|row| {
-                let nullable: String = row.get("is_nullable");
-                Column {
-                    name: row.get("column_name"),
-                    data_type: row.get("data_type"),
-                    nullable: nullable == "YES",
-                    default: row.get("column_default"),
-                }
-            })
-            .collect())
+        Ok(rows.iter().map(Self::column_from_row).collect())
     }
 
     /// Introspect indexes for a specific table.
@@ -179,15 +170,26 @@ impl PostgresIntrospector {
         .await
         .map_err(|e| IntrospectorError::QueryError(e.to_string()))?;
 
-        Ok(rows
-            .iter()
-            .map(|row| ForeignKey {
-                name: row.get("constraint_name"),
-                column: row.get("column_name"),
-                ref_table: row.get("foreign_table_name"),
-                ref_column: row.get("foreign_column_name"),
-            })
-            .collect())
+        Ok(rows.iter().map(Self::foreign_key_from_row).collect())
+    }
+
+    fn column_from_row(row: &sqlx::postgres::PgRow) -> Column {
+        let nullable: String = row.get("is_nullable");
+        Column {
+            name: row.get("column_name"),
+            data_type: row.get("data_type"),
+            nullable: nullable == NULLABLE_YES,
+            default: row.get("column_default"),
+        }
+    }
+
+    fn foreign_key_from_row(row: &sqlx::postgres::PgRow) -> ForeignKey {
+        ForeignKey {
+            name: row.get("constraint_name"),
+            column: row.get("column_name"),
+            ref_table: row.get("foreign_table_name"),
+            ref_column: row.get("foreign_column_name"),
+        }
     }
 }
 

@@ -3,6 +3,11 @@ mod commands;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
+const DEFAULT_SNAPSHOTS_DIR: &str = "./snapshots";
+const DEFAULT_DIFF_FORMAT: &str = "text";
+const DEFAULT_GRAPH_FORMAT: &str = "text";
+const DEFAULT_EXPORT_FORMAT: &str = "sql";
+
 #[derive(Parser)]
 #[command(name = "schemagit")]
 #[command(about = "Database schema versioning and inspection CLI", long_about = None)]
@@ -24,7 +29,7 @@ enum Commands {
         connection: String,
 
         /// Directory to store snapshots (default: ./snapshots)
-        #[arg(short, long, default_value = "./snapshots")]
+        #[arg(short, long, default_value = DEFAULT_SNAPSHOTS_DIR)]
         output: String,
     },
 
@@ -37,7 +42,7 @@ enum Commands {
         new: String,
 
         /// Output format (text, json)
-        #[arg(short, long, default_value = "text")]
+        #[arg(short, long, default_value = DEFAULT_DIFF_FORMAT)]
         format: String,
     },
 
@@ -65,21 +70,21 @@ enum Commands {
         connection: String,
 
         /// Directory containing snapshots (default: ./snapshots)
-        #[arg(short = 's', long, default_value = "./snapshots")]
+        #[arg(short = 's', long, default_value = DEFAULT_SNAPSHOTS_DIR)]
         snapshots: String,
     },
 
     /// List all snapshots
     List {
         /// Directory containing snapshots (default: ./snapshots)
-        #[arg(short, long, default_value = "./snapshots")]
+        #[arg(short, long, default_value = DEFAULT_SNAPSHOTS_DIR)]
         directory: String,
     },
 
     /// Show snapshot history timeline
     History {
         /// Directory containing snapshots (default: ./snapshots)
-        #[arg(short, long, default_value = "./snapshots")]
+        #[arg(short, long, default_value = DEFAULT_SNAPSHOTS_DIR)]
         directory: String,
     },
 
@@ -89,7 +94,7 @@ enum Commands {
         snapshot: String,
 
         /// Directory containing snapshots (default: ./snapshots)
-        #[arg(short, long, default_value = "./snapshots")]
+        #[arg(short, long, default_value = DEFAULT_SNAPSHOTS_DIR)]
         directory: String,
     },
 
@@ -99,7 +104,7 @@ enum Commands {
         snapshot: String,
 
         /// Directory containing snapshots (default: ./snapshots)
-        #[arg(short, long, default_value = "./snapshots")]
+        #[arg(short, long, default_value = DEFAULT_SNAPSHOTS_DIR)]
         directory: String,
     },
 
@@ -109,11 +114,11 @@ enum Commands {
         snapshot: String,
 
         /// Directory containing snapshots (default: ./snapshots)
-        #[arg(short, long, default_value = "./snapshots")]
+        #[arg(short, long, default_value = DEFAULT_SNAPSHOTS_DIR)]
         directory: String,
 
         /// Output format (text, mermaid, dot)
-        #[arg(short, long, default_value = "text")]
+        #[arg(short, long, default_value = DEFAULT_GRAPH_FORMAT)]
         format: String,
     },
 
@@ -123,11 +128,11 @@ enum Commands {
         snapshot: String,
 
         /// Directory containing snapshots (default: ./snapshots)
-        #[arg(short = 'd', long, default_value = "./snapshots")]
+        #[arg(short = 'd', long, default_value = DEFAULT_SNAPSHOTS_DIR)]
         directory: String,
 
         /// Export format (sql, json, yaml)
-        #[arg(short, long, default_value = "sql")]
+        #[arg(short, long, default_value = DEFAULT_EXPORT_FORMAT)]
         format: String,
     },
 
@@ -137,7 +142,7 @@ enum Commands {
         snapshot: String,
 
         /// Directory containing snapshots (default: ./snapshots)
-        #[arg(short, long, default_value = "./snapshots")]
+        #[arg(short, long, default_value = DEFAULT_SNAPSHOTS_DIR)]
         directory: String,
     },
 
@@ -150,7 +155,7 @@ enum Commands {
         tag: String,
 
         /// Directory containing snapshots (default: ./snapshots)
-        #[arg(short, long, default_value = "./snapshots")]
+        #[arg(short, long, default_value = DEFAULT_SNAPSHOTS_DIR)]
         directory: String,
     },
 }
