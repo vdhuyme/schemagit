@@ -1240,7 +1240,7 @@ dependencies = [
 
 [[package]]
 name = "schemagit-cli"
-version = "0.1.0"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "clap",
@@ -1257,14 +1257,14 @@ dependencies = [
 
 [[package]]
 name = "schemagit-core"
-version = "0.1.0"
+version = "0.2.3"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "schemagit-diff"
-version = "0.1.0"
+version = "0.2.3"
 dependencies = [
  "schemagit-core",
  "serde",
@@ -1273,7 +1273,7 @@ dependencies = [
 
 [[package]]
 name = "schemagit-introspector"
-version = "0.1.0"
+version = "0.2.3"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -1289,7 +1289,7 @@ dependencies = [
 
 [[package]]
 name = "schemagit-migration"
-version = "0.1.0"
+version = "0.2.3"
 dependencies = [
  "schemagit-core",
  "schemagit-diff",
@@ -1297,7 +1297,7 @@ dependencies = [
 
 [[package]]
 name = "schemagit-snapshot"
-version = "0.1.0"
+version = "0.2.3"
 dependencies = [
  "chrono",
  "schemagit-core",

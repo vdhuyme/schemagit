@@ -4,13 +4,16 @@ use schemagit_diff::diff_schemas;
 use schemagit_introspector::create_introspector;
 use schemagit_snapshot::SnapshotManager;
 
-use super::utils;
+use super::{output, utils};
 
 /// Execute the status command.
 pub async fn execute(
     driver: Option<String>,
     connection: &str,
     snapshot_dir: &str,
+    output_file: Option<&str>,
+    yes: bool,
+    no_create_dir: bool,
 ) -> Result<()> {
     println!("{}", "Checking database status...".cyan());
 
@@ -48,17 +51,23 @@ pub async fn execute(
     // Compare schemas
     let diff = diff_schemas(&latest_snapshot.schema, &current_schema);
 
-    println!("\n{}", "=== Database Status ===".bold());
+    let mut rendered = String::from("\n=== Database Status ===\n");
 
     if diff.has_changes() {
-        println!(
-            "{}",
-            "⚠ Database has drifted from snapshot!".yellow().bold()
-        );
-        println!("\n{}", diff.summary());
+        rendered.push_str("Database has drifted from snapshot!\n\n");
+        rendered.push_str(&diff.summary());
+        rendered.push('\n');
     } else {
-        println!("{}", "✓ Database matches latest snapshot".green());
+        rendered.push_str("Database matches latest snapshot\n");
     }
+
+    output::write_or_stdout(
+        &rendered,
+        output_file,
+        yes,
+        no_create_dir,
+        "Status",
+    )?;
 
     Ok(())
 }

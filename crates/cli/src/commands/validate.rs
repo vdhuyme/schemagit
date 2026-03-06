@@ -1,41 +1,21 @@
-use anyhow::{Context, Result};
-use colored::Colorize;
+use anyhow::Result;
 use schemagit_snapshot::SnapshotManager;
 use std::collections::{HashMap, HashSet};
 
+use super::{output, utils};
+
 /// Execute the validate command.
-pub fn execute(snapshot_id: &str, directory: &str) -> Result<()> {
+pub fn execute(
+    snapshot_id: &str,
+    directory: &str,
+    output_file: Option<&str>,
+    yes: bool,
+    no_create_dir: bool,
+) -> Result<()> {
     let manager = SnapshotManager::new(directory);
 
-    // Load snapshot
-    let snapshot = match snapshot_id {
-        id if id.ends_with(".snapshot.json") => manager.load(id)?,
-
-        "latest" => manager
-            .latest()
-            .context("Failed to load latest snapshot")?
-            .ok_or_else(|| {
-                anyhow::anyhow!("No snapshots found in {}", directory)
-            })?,
-
-        id => {
-            let filename = match id.len() {
-                14 => format!(
-                    "{}_{}_{}_{}.snapshot.json",
-                    &id[0..4],
-                    &id[4..6],
-                    &id[6..8],
-                    &id[8..14]
-                ),
-                _ => format!("{}.snapshot.json", id),
-            };
-
-            manager.load(&filename)?
-        }
-    };
-
-    println!("{}", "=== Schema Validation ===".bold().cyan());
-    println!();
+    let snapshot = utils::resolve_snapshot(&manager, snapshot_id, directory)?;
+    let mut content = String::from("=== Schema Validation ===\n\n");
 
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
@@ -165,44 +145,44 @@ pub fn execute(snapshot_id: &str, directory: &str) -> Result<()> {
     // Print results
     match (errors.is_empty(), warnings.is_empty()) {
         (true, true) => {
-            println!("{}", "✓ Schema validation passed!".green().bold());
-            println!("No errors or warnings found.");
+            content.push_str("Schema validation passed!\n");
+            content.push_str("No errors or warnings found.\n");
         }
 
         (false, _) => {
-            println!("{}", format!("ERRORS ({})", errors.len()).red().bold());
+            content.push_str(&format!("ERRORS ({})\n", errors.len()));
             for error in &errors {
-                println!("  {} {}", "✗".red(), error);
+                content.push_str(&format!("  - {}\n", error));
             }
-            println!();
+            content.push('\n');
         }
 
         _ => {}
     }
 
     if !warnings.is_empty() {
-        println!(
-            "{}",
-            format!("WARNINGS ({})", warnings.len()).yellow().bold()
-        );
+        content.push_str(&format!("WARNINGS ({})\n", warnings.len()));
         for warning in &warnings {
-            println!("  {} {}", "⚠".yellow(), warning);
+            content.push_str(&format!("  - {}\n", warning));
         }
-        println!();
+        content.push('\n');
     }
 
     match errors.is_empty() {
-        false => {
-            println!("{}", "Schema validation failed with errors.".red().bold())
-        }
+        false => content.push_str("Schema validation failed with errors.\n"),
         true if !warnings.is_empty() => {
-            println!(
-                "{}",
-                "Schema validation passed with warnings.".yellow().bold()
-            )
+            content.push_str("Schema validation passed with warnings.\n")
         }
         _ => {}
     }
+
+    output::write_or_stdout(
+        &content,
+        output_file,
+        yes,
+        no_create_dir,
+        "Validation report",
+    )?;
 
     Ok(())
 }

@@ -2,9 +2,8 @@ use anyhow::Result;
 use colored::Colorize;
 use schemagit_snapshot::SnapshotManager;
 use std::collections::{HashMap, HashSet};
-use std::fs;
 
-use super::utils;
+use super::{output, utils};
 
 /// Execute the graph command.
 pub fn execute(
@@ -49,16 +48,7 @@ pub fn execute(
         }
     };
 
-    match output_file {
-        Some(path) => {
-            utils::prepare_output_path(path, yes, no_create_dir)?;
-            fs::write(path, graph)?;
-            println!("{}", format!("✓ Graph saved: {}", path).green());
-        }
-        None => {
-            print!("{}", graph);
-        }
-    }
+    output::write_or_stdout(&graph, output_file, yes, no_create_dir, "Graph")?;
 
     Ok(())
 }

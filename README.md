@@ -68,7 +68,7 @@ Notes:
 ### Build
 
 ```bash
-git clone https://github.com/yourusername/schemagit.git
+git clone https://github.com/vdhuyme/schemagit.git
 cd schemagit
 cargo build --release
 ```
@@ -153,13 +153,13 @@ schemagit tag <snapshot> <tag-name> [-d <directory>]
 
 ```bash
 # Diff snapshots
-schemagit diff <old> <new> [--snapshot-dir <dir>] [--format text|json]
+schemagit diff <old> <new> [--snapshot-dir <dir>] [--format text|json] [-o <output-file>] [--yes|--no-create-dir]
 
 # Generate migration SQL (stdout by default)
 schemagit migrate <old> <new> [--snapshot-dir <dir>] [-o <output-file>] [--yes|--no-create-dir]
 
 # Drift check against latest snapshot
-schemagit status -c <connection-string> [-d <driver>] [-s <snapshots-dir>]
+schemagit status -c <connection-string> [-d <driver>] [-s <snapshots-dir>] [-o <output-file>] [--yes|--no-create-dir]
 ```
 
 ### Visualization And Export
@@ -169,7 +169,10 @@ schemagit status -c <connection-string> [-d <driver>] [-s <snapshots-dir>]
 schemagit graph <snapshot> [--format text|mermaid|dot] [-d <directory>] [-o <output-file>] [--yes|--no-create-dir]
 
 # Export snapshot
-schemagit export <snapshot> --format <sql|json|yaml> [-d <directory>]
+schemagit export <snapshot> --format <sql|json|yaml> [-d <directory>] [-o <output-file>] [--yes|--no-create-dir]
+
+# Show CLI version from Cargo metadata
+schemagit --version
 ```
 
 ---
@@ -221,7 +224,7 @@ schemagit migrate latest previous --snapshot-dir ./db/snapshots -o ./migrations/
 
 ## Output File Behavior
 
-Applies to commands using `-o/--output` (`graph`, `migrate`).
+Applies to output-producing commands (`diff`, `migrate`, `status`, `list`, `snapshots`, `history`, `show`, `summary`, `graph`, `export`, `validate`).
 
 When output parent directory does not exist:
 
@@ -284,8 +287,42 @@ schemagit migrate previous latest -o ./artifacts/migration.sql --yes
 
 ```bash
 schemagit validate latest
-schemagit export latest --format sql > schema.sql
-schemagit export latest --format json > schema.json
+schemagit validate latest -o ./reports/validation.txt --yes
+schemagit export latest --format sql -o ./reports/schema.sql --yes
+schemagit export latest --format json -o ./reports/schema.json --yes
+```
+
+### Release Versioning
+
+```bash
+# Install cargo-edit once
+cargo install cargo-edit
+
+# Bump workspace version
+cargo set-version --workspace --bump patch
+cargo set-version --workspace --bump minor
+cargo set-version --workspace --bump major
+
+# Run helper script (bump + commit + tag)
+./scripts/release.sh patch
+./scripts/release.sh minor
+./scripts/release.sh major
+```
+
+Workspace versioning is centralized in root `Cargo.toml`:
+
+```toml
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+```
+
+All crates inherit from workspace metadata:
+
+```toml
+[package]
+version.workspace = true
+edition.workspace = true
 ```
 
 ---

@@ -7,9 +7,11 @@ const DEFAULT_SNAPSHOTS_DIR: &str = "./snapshots";
 const DEFAULT_DIFF_FORMAT: &str = "text";
 const DEFAULT_GRAPH_FORMAT: &str = "text";
 const DEFAULT_EXPORT_FORMAT: &str = "sql";
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Parser)]
 #[command(name = "schemagit")]
+#[command(version = VERSION)]
 #[command(about = "Database schema versioning and inspection CLI", long_about = None)]
 struct Cli {
     #[command(subcommand)]
@@ -48,6 +50,18 @@ enum Commands {
         /// Output format (text, json)
         #[arg(short, long, default_value = DEFAULT_DIFF_FORMAT)]
         format: String,
+
+        /// Output file (default: stdout)
+        #[arg(short, long)]
+        output: Option<String>,
+
+        /// Automatically create missing output directory
+        #[arg(long, conflicts_with = "no_create_dir")]
+        yes: bool,
+
+        /// Do not create missing output directory
+        #[arg(long = "no-create-dir", conflicts_with = "yes")]
+        no_create_dir: bool,
     },
 
     /// Generate a migration script from two snapshots
@@ -88,6 +102,18 @@ enum Commands {
         /// Directory containing snapshots (default: ./snapshots)
         #[arg(short = 's', long, default_value = DEFAULT_SNAPSHOTS_DIR)]
         snapshots: String,
+
+        /// Output file (default: stdout)
+        #[arg(short, long)]
+        output: Option<String>,
+
+        /// Automatically create missing output directory
+        #[arg(long, conflicts_with = "no_create_dir")]
+        yes: bool,
+
+        /// Do not create missing output directory
+        #[arg(long = "no-create-dir", conflicts_with = "yes")]
+        no_create_dir: bool,
     },
 
     /// List all snapshots
@@ -95,6 +121,18 @@ enum Commands {
         /// Directory containing snapshots (default: ./snapshots)
         #[arg(short, long, default_value = DEFAULT_SNAPSHOTS_DIR)]
         directory: String,
+
+        /// Output file (default: stdout)
+        #[arg(short, long)]
+        output: Option<String>,
+
+        /// Automatically create missing output directory
+        #[arg(long, conflicts_with = "no_create_dir")]
+        yes: bool,
+
+        /// Do not create missing output directory
+        #[arg(long = "no-create-dir", conflicts_with = "yes")]
+        no_create_dir: bool,
     },
 
     /// List snapshot IDs in timestamp order
@@ -102,6 +140,18 @@ enum Commands {
         /// Directory containing snapshots (default: ./snapshots)
         #[arg(short, long, default_value = DEFAULT_SNAPSHOTS_DIR)]
         directory: String,
+
+        /// Output file (default: stdout)
+        #[arg(short, long)]
+        output: Option<String>,
+
+        /// Automatically create missing output directory
+        #[arg(long, conflicts_with = "no_create_dir")]
+        yes: bool,
+
+        /// Do not create missing output directory
+        #[arg(long = "no-create-dir", conflicts_with = "yes")]
+        no_create_dir: bool,
     },
 
     /// Show snapshot history timeline
@@ -109,6 +159,18 @@ enum Commands {
         /// Directory containing snapshots (default: ./snapshots)
         #[arg(short, long, default_value = DEFAULT_SNAPSHOTS_DIR)]
         directory: String,
+
+        /// Output file (default: stdout)
+        #[arg(short, long)]
+        output: Option<String>,
+
+        /// Automatically create missing output directory
+        #[arg(long, conflicts_with = "no_create_dir")]
+        yes: bool,
+
+        /// Do not create missing output directory
+        #[arg(long = "no-create-dir", conflicts_with = "yes")]
+        no_create_dir: bool,
     },
 
     /// Show detailed information about a snapshot
@@ -119,6 +181,18 @@ enum Commands {
         /// Directory containing snapshots (default: ./snapshots)
         #[arg(short, long, default_value = DEFAULT_SNAPSHOTS_DIR)]
         directory: String,
+
+        /// Output file (default: stdout)
+        #[arg(short, long)]
+        output: Option<String>,
+
+        /// Automatically create missing output directory
+        #[arg(long, conflicts_with = "no_create_dir")]
+        yes: bool,
+
+        /// Do not create missing output directory
+        #[arg(long = "no-create-dir", conflicts_with = "yes")]
+        no_create_dir: bool,
     },
 
     /// Display schema summary statistics
@@ -129,6 +203,18 @@ enum Commands {
         /// Directory containing snapshots (default: ./snapshots)
         #[arg(short, long, default_value = DEFAULT_SNAPSHOTS_DIR)]
         directory: String,
+
+        /// Output file (default: stdout)
+        #[arg(short, long)]
+        output: Option<String>,
+
+        /// Automatically create missing output directory
+        #[arg(long, conflicts_with = "no_create_dir")]
+        yes: bool,
+
+        /// Do not create missing output directory
+        #[arg(long = "no-create-dir", conflicts_with = "yes")]
+        no_create_dir: bool,
     },
 
     /// Visualize schema relationships as a graph
@@ -169,6 +255,18 @@ enum Commands {
         /// Export format (sql, json, yaml)
         #[arg(short, long, default_value = DEFAULT_EXPORT_FORMAT)]
         format: String,
+
+        /// Output file (default: stdout)
+        #[arg(short, long)]
+        output: Option<String>,
+
+        /// Automatically create missing output directory
+        #[arg(long, conflicts_with = "no_create_dir")]
+        yes: bool,
+
+        /// Do not create missing output directory
+        #[arg(long = "no-create-dir", conflicts_with = "yes")]
+        no_create_dir: bool,
     },
 
     /// Validate schema for common issues
@@ -179,6 +277,18 @@ enum Commands {
         /// Directory containing snapshots (default: ./snapshots)
         #[arg(short, long, default_value = DEFAULT_SNAPSHOTS_DIR)]
         directory: String,
+
+        /// Output file (default: stdout)
+        #[arg(short, long)]
+        output: Option<String>,
+
+        /// Automatically create missing output directory
+        #[arg(long, conflicts_with = "no_create_dir")]
+        yes: bool,
+
+        /// Do not create missing output directory
+        #[arg(long = "no-create-dir", conflicts_with = "yes")]
+        no_create_dir: bool,
     },
 
     /// Tag a snapshot with a meaningful name
@@ -211,7 +321,18 @@ async fn main() -> Result<()> {
             new,
             snapshot_dir,
             format,
-        } => commands::diff::execute(&old, &new, &snapshot_dir, &format),
+            output,
+            yes,
+            no_create_dir,
+        } => commands::diff::execute(
+            &old,
+            &new,
+            &snapshot_dir,
+            &format,
+            output.as_deref(),
+            yes,
+            no_create_dir,
+        ),
 
         Commands::Migrate {
             old,
@@ -233,27 +354,84 @@ async fn main() -> Result<()> {
             driver,
             connection,
             snapshots,
-        } => commands::status::execute(driver, &connection, &snapshots).await,
-
-        Commands::List { directory } => commands::list::execute(&directory),
-
-        Commands::Snapshots { directory } => {
-            commands::snapshots::execute(&directory)
+            output,
+            yes,
+            no_create_dir,
+        } => {
+            commands::status::execute(
+                driver,
+                &connection,
+                &snapshots,
+                output.as_deref(),
+                yes,
+                no_create_dir,
+            )
+            .await
         }
 
-        Commands::History { directory } => {
-            commands::history::execute(&directory)
-        }
+        Commands::List {
+            directory,
+            output,
+            yes,
+            no_create_dir,
+        } => commands::list::execute(
+            &directory,
+            output.as_deref(),
+            yes,
+            no_create_dir,
+        ),
+
+        Commands::Snapshots {
+            directory,
+            output,
+            yes,
+            no_create_dir,
+        } => commands::snapshots::execute(
+            &directory,
+            output.as_deref(),
+            yes,
+            no_create_dir,
+        ),
+
+        Commands::History {
+            directory,
+            output,
+            yes,
+            no_create_dir,
+        } => commands::history::execute(
+            &directory,
+            output.as_deref(),
+            yes,
+            no_create_dir,
+        ),
 
         Commands::Show {
             snapshot,
             directory,
-        } => commands::show::execute(&snapshot, &directory),
+            output,
+            yes,
+            no_create_dir,
+        } => commands::show::execute(
+            &snapshot,
+            &directory,
+            output.as_deref(),
+            yes,
+            no_create_dir,
+        ),
 
         Commands::Summary {
             snapshot,
             directory,
-        } => commands::summary::execute(&snapshot, &directory),
+            output,
+            yes,
+            no_create_dir,
+        } => commands::summary::execute(
+            &snapshot,
+            &directory,
+            output.as_deref(),
+            yes,
+            no_create_dir,
+        ),
 
         Commands::Graph {
             snapshot,
@@ -275,12 +453,31 @@ async fn main() -> Result<()> {
             snapshot,
             directory,
             format,
-        } => commands::export::execute(&snapshot, &directory, &format),
+            output,
+            yes,
+            no_create_dir,
+        } => commands::export::execute(
+            &snapshot,
+            &directory,
+            &format,
+            output.as_deref(),
+            yes,
+            no_create_dir,
+        ),
 
         Commands::Validate {
             snapshot,
             directory,
-        } => commands::validate::execute(&snapshot, &directory),
+            output,
+            yes,
+            no_create_dir,
+        } => commands::validate::execute(
+            &snapshot,
+            &directory,
+            output.as_deref(),
+            yes,
+            no_create_dir,
+        ),
 
         Commands::Tag {
             snapshot,

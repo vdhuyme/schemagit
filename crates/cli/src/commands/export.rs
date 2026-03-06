@@ -3,34 +3,45 @@ use colored::Colorize;
 use schemagit_core::{Column, Table};
 use schemagit_snapshot::SnapshotManager;
 
-use super::utils;
+use super::{output, utils};
 
 const UNIQUE_PREFIX: &str = "UNIQUE ";
 const EMPTY: &str = "";
 
 /// Execute the export command.
-pub fn execute(snapshot_id: &str, directory: &str, format: &str) -> Result<()> {
+pub fn execute(
+    snapshot_id: &str,
+    directory: &str,
+    format: &str,
+    output_file: Option<&str>,
+    yes: bool,
+    no_create_dir: bool,
+) -> Result<()> {
     let manager = SnapshotManager::new(directory);
     let snapshot = utils::resolve_snapshot(&manager, snapshot_id, directory)?;
 
-    match format.to_lowercase().as_str() {
+    let rendered = match format.to_lowercase().as_str() {
         "sql" => {
-            let sql = export_sql_string(
-                &snapshot.schema.tables,
-                &snapshot.database_type,
-            );
-            print!("{}", sql);
+            export_sql_string(&snapshot.schema.tables, &snapshot.database_type)
         }
         "json" => export_json(&snapshot)?,
-        "yaml" => export_yaml(&snapshot)?,
+        "yaml" => export_yaml(&snapshot),
         _ => {
-            println!(
+            return Err(anyhow::anyhow!(
                 "{}",
                 format!("Unknown format: {}. Use sql, json, or yaml", format)
                     .red()
-            );
+            ));
         }
-    }
+    };
+
+    output::write_or_stdout(
+        &rendered,
+        output_file,
+        yes,
+        no_create_dir,
+        "Export",
+    )?;
 
     Ok(())
 }
@@ -130,60 +141,72 @@ fn quote_identifier(db_type: &str, name: &str) -> String {
 }
 
 /// Export snapshot as JSON.
-fn export_json(snapshot: &schemagit_snapshot::Snapshot) -> Result<()> {
+fn export_json(snapshot: &schemagit_snapshot::Snapshot) -> Result<String> {
     let json = serde_json::to_string_pretty(snapshot)
         .context("Failed to serialize snapshot to JSON")?;
-    println!("{}", json);
-    Ok(())
+    Ok(json)
 }
 
 /// Export snapshot as YAML.
-fn export_yaml(snapshot: &schemagit_snapshot::Snapshot) -> Result<()> {
+fn export_yaml(snapshot: &schemagit_snapshot::Snapshot) -> String {
     // Simple YAML-like output (without external dependency)
-    println!("database_type: {}", snapshot.database_type);
-    println!(
-        "timestamp: {}",
+    let mut yaml = String::new();
+    yaml.push_str(&format!("database_type: {}\n", snapshot.database_type));
+    yaml.push_str(&format!(
+        "timestamp: {}\n",
         snapshot.timestamp.format("%Y-%m-%d %H:%M:%S")
-    );
-    println!("schema:");
-    println!("  tables:");
+    ));
+    yaml.push_str("schema:\n");
+    yaml.push_str("  tables:\n");
 
     for table in &snapshot.schema.tables {
-        println!("    - name: {}", table.name);
-        println!("      columns:");
+        yaml.push_str(&format!("    - name: {}\n", table.name));
+        yaml.push_str("      columns:\n");
         for column in &table.columns {
-            println!("        - name: {}", column.name);
-            println!("          data_type: {}", column.data_type);
-            println!("          nullable: {}", column.nullable);
+            yaml.push_str(&format!("        - name: {}\n", column.name));
+            yaml.push_str(&format!(
+                "          data_type: {}\n",
+                column.data_type
+            ));
+            yaml.push_str(&format!(
+                "          nullable: {}\n",
+                column.nullable
+            ));
             if let Some(ref default) = column.default {
-                println!("          default: {}", default);
+                yaml.push_str(&format!("          default: {}\n", default));
             }
         }
 
         if !table.indexes.is_empty() {
-            println!("      indexes:");
+            yaml.push_str("      indexes:\n");
             for index in &table.indexes {
-                println!("        - name: {}", index.name);
-                println!("          unique: {}", index.unique);
-                println!("          columns:");
+                yaml.push_str(&format!("        - name: {}\n", index.name));
+                yaml.push_str(&format!("          unique: {}\n", index.unique));
+                yaml.push_str("          columns:\n");
                 for col in &index.columns {
-                    println!("            - {}", col);
+                    yaml.push_str(&format!("            - {}\n", col));
                 }
             }
         }
 
         if !table.foreign_keys.is_empty() {
-            println!("      foreign_keys:");
+            yaml.push_str("      foreign_keys:\n");
             for fk in &table.foreign_keys {
-                println!("        - name: {}", fk.name);
-                println!("          column: {}", fk.column);
-                println!("          ref_table: {}", fk.ref_table);
-                println!("          ref_column: {}", fk.ref_column);
+                yaml.push_str(&format!("        - name: {}\n", fk.name));
+                yaml.push_str(&format!("          column: {}\n", fk.column));
+                yaml.push_str(&format!(
+                    "          ref_table: {}\n",
+                    fk.ref_table
+                ));
+                yaml.push_str(&format!(
+                    "          ref_column: {}\n",
+                    fk.ref_column
+                ));
             }
         }
     }
 
-    Ok(())
+    yaml
 }
 
 #[cfg(test)]

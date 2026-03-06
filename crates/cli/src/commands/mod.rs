@@ -4,6 +4,7 @@ pub mod graph;
 pub mod history;
 pub mod list;
 pub mod migrate;
+pub mod output;
 pub mod show;
 pub mod snapshot;
 pub mod snapshots;

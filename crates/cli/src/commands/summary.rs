@@ -1,12 +1,17 @@
 use anyhow::Result;
-use colored::Colorize;
 use schemagit_snapshot::SnapshotManager;
 use std::collections::HashMap;
 
-use super::utils;
+use super::{output, utils};
 
 /// Execute the summary command.
-pub fn execute(snapshot_id: &str, directory: &str) -> Result<()> {
+pub fn execute(
+    snapshot_id: &str,
+    directory: &str,
+    output_file: Option<&str>,
+    yes: bool,
+    no_create_dir: bool,
+) -> Result<()> {
     let manager = SnapshotManager::new(directory);
     let snapshot = utils::resolve_snapshot(&manager, snapshot_id, directory)?;
 
@@ -23,25 +28,20 @@ pub fn execute(snapshot_id: &str, directory: &str) -> Result<()> {
         .map(|t| t.foreign_keys.len())
         .sum();
 
-    println!("{}", "=== Schema Summary ===".bold().cyan());
-    println!();
-    println!("{}: {}", "Database".bold(), snapshot.database_type);
-    println!(
-        "{}: {}",
-        "Snapshot".bold(),
+    let mut content = String::new();
+    content.push_str("=== Schema Summary ===\n\n");
+    content.push_str(&format!("Database: {}\n", snapshot.database_type));
+    content.push_str(&format!(
+        "Snapshot: {}\n",
         snapshot.timestamp.format("%Y-%m-%d %H:%M:%S")
-    );
-    println!();
+    ));
+    content.push('\n');
 
-    println!("{}", "Overview:".bold());
-    println!("  Tables:       {}", total_tables.to_string().green());
-    println!("  Columns:      {}", total_columns.to_string().cyan());
-    println!("  Indexes:      {}", total_indexes.to_string().yellow());
-    println!(
-        "  Foreign Keys: {}",
-        total_foreign_keys.to_string().magenta()
-    );
-    println!();
+    content.push_str("Overview:\n");
+    content.push_str(&format!("  Tables:       {}\n", total_tables));
+    content.push_str(&format!("  Columns:      {}\n", total_columns));
+    content.push_str(&format!("  Indexes:      {}\n", total_indexes));
+    content.push_str(&format!("  Foreign Keys: {}\n\n", total_foreign_keys));
 
     let mut table_sizes: Vec<(&str, usize)> = snapshot
         .schema
@@ -51,11 +51,11 @@ pub fn execute(snapshot_id: &str, directory: &str) -> Result<()> {
         .collect();
     table_sizes.sort_by(|a, b| b.1.cmp(&a.1));
 
-    println!("{}", "Top tables by column count:".bold());
+    content.push_str("Top tables by column count:\n");
     for (i, (name, count)) in table_sizes.iter().take(10).enumerate() {
-        println!("  {}. {}: {}", i + 1, name.green(), count);
+        content.push_str(&format!("  {}. {}: {}\n", i + 1, name, count));
     }
-    println!();
+    content.push('\n');
 
     let mut type_counts: HashMap<String, usize> = HashMap::new();
     for table in &snapshot.schema.tables {
@@ -67,10 +67,18 @@ pub fn execute(snapshot_id: &str, directory: &str) -> Result<()> {
     let mut type_vec: Vec<(String, usize)> = type_counts.into_iter().collect();
     type_vec.sort_by(|a, b| b.1.cmp(&a.1));
 
-    println!("{}", "Column type distribution:".bold());
+    content.push_str("Column type distribution:\n");
     for (data_type, count) in type_vec.iter().take(10) {
-        println!("  {}: {}", data_type.yellow(), count);
+        content.push_str(&format!("  {}: {}\n", data_type, count));
     }
+
+    output::write_or_stdout(
+        &content,
+        output_file,
+        yes,
+        no_create_dir,
+        "Summary",
+    )?;
 
     Ok(())
 }

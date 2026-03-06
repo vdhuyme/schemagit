@@ -3,7 +3,7 @@ use colored::Colorize;
 use schemagit_diff::diff_schemas;
 use schemagit_snapshot::SnapshotManager;
 
-use super::utils;
+use super::{output, utils};
 
 /// Execute the diff command.
 pub fn execute(
@@ -11,6 +11,9 @@ pub fn execute(
     new_path: &str,
     snapshot_dir: &str,
     format: &str,
+    output_file: Option<&str>,
+    yes: bool,
+    no_create_dir: bool,
 ) -> Result<()> {
     println!("{}", "Comparing snapshots...".cyan());
 
@@ -44,22 +47,28 @@ pub fn execute(
     // Compare schemas
     let diff = diff_schemas(&old_snapshot.schema, &new_snapshot.schema);
 
-    // Output based on format
-    match format.to_lowercase().as_str() {
-        "json" => {
-            let json = serde_json::to_string_pretty(&diff)
-                .context("Failed to serialize diff to JSON")?;
-            println!("{}", json);
-        }
+    let rendered = match format.to_lowercase().as_str() {
+        "json" => serde_json::to_string_pretty(&diff)
+            .context("Failed to serialize diff to JSON")?,
         _ => {
-            println!("\n{}", "=== Schema Differences ===".bold());
+            let mut text =
+                format!("\n{}\n", "=== Schema Differences ===".bold());
             if diff.has_changes() {
-                println!("{}", diff.summary());
+                text.push_str(&format!("{}\n", diff.summary()));
             } else {
-                println!("{}", "No changes detected".green());
+                text.push_str(&format!("{}\n", "No changes detected".green()));
             }
+            text
         }
-    }
+    };
+
+    output::write_or_stdout(
+        &rendered,
+        output_file,
+        yes,
+        no_create_dir,
+        "Diff output",
+    )?;
 
     Ok(())
 }
