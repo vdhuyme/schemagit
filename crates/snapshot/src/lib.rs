@@ -229,12 +229,12 @@ impl SnapshotManager {
             let entry = entry?;
             let path = entry.path();
 
-            if path.is_file() {
-                if let Some(filename) = path.file_name() {
-                    let filename = filename.to_string_lossy().to_string();
-                    if filename.ends_with(SNAPSHOT_EXTENSION) {
-                        snapshots.push(filename);
-                    }
+            if path.is_file()
+                && let Some(filename) = path.file_name()
+            {
+                let filename = filename.to_string_lossy().to_string();
+                if filename.ends_with(SNAPSHOT_EXTENSION) {
+                    snapshots.push(filename);
                 }
             }
         }

@@ -263,14 +263,13 @@ fn diff_columns(
     for name in old_names.intersection(&new_names) {
         if let (Some(&old_col), Some(&new_col)) =
             (old_cols.get(name), new_cols.get(name))
+            && old_col != new_col
         {
-            if old_col != new_col {
-                columns_modified.push(ColumnModification {
-                    column_name: name.clone(),
-                    old_column: old_col.clone(),
-                    new_column: new_col.clone(),
-                });
-            }
+            columns_modified.push(ColumnModification {
+                column_name: name.clone(),
+                old_column: old_col.clone(),
+                new_column: new_col.clone(),
+            });
         }
     }
 
@@ -307,11 +306,10 @@ fn diff_indexes(
 
     for name in old_names.intersection(&new_names) {
         if let (Some(old), Some(new)) = (old_idxs.get(name), new_idxs.get(name))
+            && old != new
         {
-            if old != new {
-                indexes_removed.push((*old).clone());
-                indexes_added.push((*new).clone());
-            }
+            indexes_removed.push((*old).clone());
+            indexes_added.push((*new).clone());
         }
     }
 
@@ -348,11 +346,10 @@ fn diff_foreign_keys(
     for name in old_names.intersection(&new_names) {
         if let (Some(old), Some(new)) =
             (old_fks_map.get(name), new_fks_map.get(name))
+            && old != new
         {
-            if old != new {
-                foreign_keys_removed.push((*old).clone());
-                foreign_keys_added.push((*new).clone());
-            }
+            foreign_keys_removed.push((*old).clone());
+            foreign_keys_added.push((*new).clone());
         }
     }
 
