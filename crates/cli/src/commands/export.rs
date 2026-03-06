@@ -159,37 +159,6 @@ fn export_json(snapshot: &schemagit_snapshot::Snapshot) -> Result<()> {
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use schemagit_core::Table;
-
-    #[test]
-    fn quote_identifier_mssql() {
-        assert_eq!(quote_identifier("mssql", "users"), "[users]");
-        assert_eq!(quote_identifier("mssql", "a]b"), "[a]]b]");
-    }
-
-    #[test]
-    fn export_table_sql_string_mssql_uses_brackets() {
-        let table = Table {
-            name: "users".to_string(),
-            columns: vec![Column {
-                name: "id".to_string(),
-                data_type: "int".to_string(),
-                nullable: false,
-                default: None,
-            }],
-            indexes: vec![],
-            foreign_keys: vec![],
-        };
-
-        let sql = export_table_sql_string(&table, "mssql");
-        assert!(sql.contains("CREATE TABLE [users]"));
-        assert!(sql.contains("[id] int NOT NULL"));
-    }
-}
-
 /// Export snapshot as YAML.
 fn export_yaml(snapshot: &schemagit_snapshot::Snapshot) -> Result<()> {
     // Simple YAML-like output (without external dependency)
@@ -237,4 +206,35 @@ fn export_yaml(snapshot: &schemagit_snapshot::Snapshot) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use schemagit_core::Table;
+
+    #[test]
+    fn quote_identifier_mssql() {
+        assert_eq!(quote_identifier("mssql", "users"), "[users]");
+        assert_eq!(quote_identifier("mssql", "a]b"), "[a]]b]");
+    }
+
+    #[test]
+    fn export_table_sql_string_mssql_uses_brackets() {
+        let table = Table {
+            name: "users".to_string(),
+            columns: vec![Column {
+                name: "id".to_string(),
+                data_type: "int".to_string(),
+                nullable: false,
+                default: None,
+            }],
+            indexes: vec![],
+            foreign_keys: vec![],
+        };
+
+        let sql = export_table_sql_string(&table, "mssql");
+        assert!(sql.contains("CREATE TABLE [users]"));
+        assert!(sql.contains("[id] int NOT NULL"));
+    }
 }

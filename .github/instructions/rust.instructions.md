@@ -140,4 +140,143 @@ Before publishing or reviewing Rust code, ensure:
 - [ ] **Future Proofing**: Private fields in structs, sealed traits where appropriate
 - [ ] **Tooling**: Code passes `cargo fmt`, `cargo clippy`, and `cargo test`
 
+### Avoid Magic Values
+
+- Do not use **magic strings** or **magic numbers** directly in code.
+- All repeated strings must be defined as `const` or `static`.
+- Numeric constants must have meaningful names.
+
+Example:
+
+```rust
+const DEFAULT_TIMEOUT_SECONDS: u64 = 30;
+const SNAPSHOT_EXTENSION: &str = ".snapshot.json";
+```
+
+---
+
+### Limit Function Complexity
+
+Functions must remain small and focused.
+
+Rules:
+
+- Maximum **40 lines per function**
+- Maximum **3 levels of nesting**
+- Maximum **4 parameters**
+
+If limits are exceeded:
+
+- Extract helper functions
+- Split logic into modules
+- Introduce structs or builders
+
+---
+
+### Avoid Deep `if / else` Chains
+
+Prefer `match` instead of long `if / else` chains.
+
+Bad:
+
+```rust
+if db_type == "mssql" {
+    ...
+} else if db_type == "postgres" {
+    ...
+} else if db_type == "mysql" {
+    ...
+}
+```
+
+Good:
+
+```rust
+match db_type {
+    "mssql" => ...,
+    "postgres" => ...,
+    "mysql" => ...,
+    _ => ...
+}
+```
+
+---
+
+### Prefer Early Returns
+
+Avoid nested control flow.
+
+Bad:
+
+```rust
+fn run() {
+    if condition {
+        do_work();
+    }
+}
+```
+
+Good:
+
+```rust
+fn run() {
+    if !condition {
+        return;
+    }
+
+    do_work();
+}
+```
+
+---
+
+### Maximum Nesting Depth
+
+Code must not exceed **3 nested blocks**.
+
+If deeper nesting appears, refactor logic into helper functions.
+
+---
+
+### Maximum File Size
+
+Module files should stay manageable.
+
+Limits:
+
+- Recommended: **300 lines**
+- Hard limit: **500 lines**
+
+If exceeded, split the module into submodules.
+
+Example:
+
+```
+commands/
+    export.rs
+    export_sql.rs
+    export_yaml.rs
+```
+
+---
+
+### No Repeated Logic
+
+Duplicate logic must be extracted into reusable helper functions or modules.
+
+---
+
+### Avoid Unnecessary Allocations
+
+Prefer borrowing over allocation.
+
+Prefer:
+
+```
+&str over String
+&[T] over Vec<T>
+```
+
+Allocate only when ownership is required.
+
 ### Do not generate markdown files after completing the code.
