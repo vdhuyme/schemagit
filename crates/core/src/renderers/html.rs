@@ -8,13 +8,24 @@ pub struct HtmlRenderer;
 #[derive(Template)]
 #[template(path = "graph.html")]
 struct GraphTemplate {
+    #[allow(dead_code)]
     mermaid: String,
-    tables: Vec<TableInfo>,
+    #[allow(dead_code)]
+    schema_json: String,
 }
 
+#[derive(serde::Serialize)]
+struct ColumnInfo {
+    name: String,
+    data_type: String,
+    nullable: bool,
+    is_primary: bool,
+}
+
+#[derive(serde::Serialize)]
 struct TableInfo {
     name: String,
-    columns_count: usize,
+    columns: Vec<ColumnInfo>,
 }
 
 impl GraphRenderer for HtmlRenderer {
@@ -22,18 +33,34 @@ impl GraphRenderer for HtmlRenderer {
         let mermaid_renderer = MermaidRenderer;
         let mermaid_content = mermaid_renderer.render(graph);
 
-        let tables = graph
+        let tables: Vec<TableInfo> = graph
             .tables
             .iter()
-            .map(|t| TableInfo {
-                name: t.name.clone(),
-                columns_count: t.columns.len(),
+            .map(|t| {
+                let columns = t
+                    .columns
+                    .iter()
+                    .map(|c| ColumnInfo {
+                        name: c.name.clone(),
+                        data_type: c.data_type.clone(),
+                        nullable: c.nullable,
+                        is_primary: c.is_primary,
+                    })
+                    .collect();
+
+                TableInfo {
+                    name: t.name.clone(),
+                    columns,
+                }
             })
             .collect();
 
+        let schema_json =
+            serde_json::to_string(&tables).unwrap_or_else(|_| "[]".to_string());
+
         let template = GraphTemplate {
             mermaid: mermaid_content,
-            tables,
+            schema_json,
         };
 
         template
